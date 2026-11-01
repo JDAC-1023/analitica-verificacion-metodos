@@ -91,12 +91,13 @@ def panel(e) -> None:
         k3.metric("Conjuntos preparados", est["preparaciones"], border=True)
         k4.metric("Informes emitidos", est["informes"], border=True)
         if res:
-            g = resumen_global(res)
+            from src.motor import flujo
+            v = flujo.veredicto(res)
             with st.container(border=True):
-                st.markdown(f"#### :{g['color']}[:material/verified:] {g['etiqueta']}")
-                st.write(g["texto"])
-                for t in hallazgos(res):
-                    st.markdown(f"- {t}")
+                st.markdown(f"#### :{v['color']}[:material/verified:] {v['titulo']}")
+                st.write(v["texto"])
+                for i in flujo.implicaciones(res):
+                    st.markdown(f"- **{i['caracteristica']}:** {i['que_implica']}")
         else:
             st.info("Este estudio aún no tiene un análisis ejecutado.", icon=":material/pending:")
         st.markdown("**Siguiente paso**")

@@ -44,13 +44,15 @@ QUE_HACE = [
     ("Grubbs (réplicas)", "Busca un dato raro dentro de las repeticiones hechas en las mismas condiciones."),
     ("Grubbs", "Busca un laboratorio cuyo promedio sea raro frente a los demás."),
     ("Dixon", "Otra forma de buscar datos raros en grupos pequeños."),
+    ("Homocedasticidad", "Revisa si las series (técnico + patrón) tienen dispersiones parecidas; decide qué prueba se usa para compararlas."),
     ("Shapiro", "Revisa si los datos tienen la forma de campana (distribución normal) que suponen varias pruebas."),
     ("Anderson", "Revisa si los datos tienen forma de campana, poniendo atención a los extremos."),
     ("Lilliefors", "Revisa si los datos tienen forma de campana."),
     ("Fuentes de variación", "Compara técnicos, patrones (y su combinación) para ver si el resultado depende de quién mide o con qué patrón."),
     ("Sesgo", "Mide cuánto se desvía, en promedio, el resultado respecto al valor de referencia."),
     ("Repetibilidad", "Mide cuánto varían los resultados al repetir la medición en las mismas condiciones."),
-    ("Precisión intermedia", "Mide cuánto varían los resultados cuando cambian condiciones del laboratorio (técnico, día, patrón)."),
+    ("Reproducibilidad intralaboratorio", "Mide cuánto varían los resultados dentro del laboratorio cuando cambian las condiciones (técnico, patrón, día). También se llama precisión intermedia."),
+    ("Reproducibilidad interlaboratorio", "Mide cuánto varían los resultados entre laboratorios distintos."),
     ("Reproducibilidad", "Mide cuánto varían los resultados entre laboratorios distintos."),
     ("Suficiencia", "Revisa que haya datos para analizar."),
 ]
@@ -64,6 +66,9 @@ def _por_que_no(r: dict) -> tuple[str, str]:
     """Explicación sencilla de por qué no se aplicó y qué haría falta."""
     m = " ".join(r.get("motivos") or [])
     tec = r["tecnica"]
+    if "entre laboratorios necesita" in m:
+        return ("La reproducibilidad entre laboratorios necesita varios laboratorios. La de tu laboratorio (cambiando técnico, "
+                "patrón o día) sí se midió: mira «Reproducibilidad intralaboratorio».", "Nada: ya está evaluada dentro del laboratorio.")
     if "no es interlaboratorio" in m or "no son laboratorios" in m:
         return ("Esta prueba es para comparar laboratorios distintos. Tu estudio se hizo en un solo laboratorio "
                 "(cambiar de técnico no es cambiar de laboratorio), así que no corresponde usarla.",
@@ -108,6 +113,12 @@ def _resultado(r: dict) -> str:
         return f"Los datos se analizan en {e.get('valor')} punto(s) de medición."
     if tec.startswith("Exclusiones"):
         return f"Se dejaron por fuera {r['n']} dato(s) por decisión técnica documentada; el dato original se conserva."
+    if r["etapa"] == "homocedasticidad":
+        e2 = r.get("estimacion") or {}
+        if di == "Se rechaza H0":
+            return (f"Las series NO tienen dispersiones parecidas (p = {fmt_p(r.get('p_valor'))}): la más dispersa es {e2.get('serie_max')} "
+                    f"(s = {fmt(e2.get('s_max'))}). Por eso la comparación usa una prueba que no exige varianzas iguales.")
+        return (f"Las series tienen dispersiones parecidas (p = {fmt_p(r.get('p_valor'))}); se puede usar la comparación clásica.")
     if r["etapa"] == "normalidad":
         if di == "Se rechaza H0":
             return (f"Los datos NO tienen forma de campana (p = {fmt_p(r.get('p_valor'))}). "
@@ -142,10 +153,10 @@ def _resultado(r: dict) -> str:
         return "; ".join(partes) + "." if partes else r.get("texto", "")
     if tec.startswith("Repetibilidad"):
         return f"Al repetir en las mismas condiciones, los resultados varían típicamente ± {fmt(e.get('valor'))} {u} (desviación estándar)."
-    if tec.startswith("Precisión intermedia"):
+    if tec.startswith("Reproducibilidad intralaboratorio"):
         return (f"Cuando cambian técnico, día o patrón, la variación típica es ± {fmt(e.get('valor'))} {u}; "
                 f"de ella, ± {fmt(e.get('s_entre'))} {u} se debe al cambio de condiciones.")
-    if tec.startswith("Reproducibilidad"):
+    if tec.startswith("Reproducibilidad interlaboratorio"):
         return f"Entre laboratorios, la variación típica es ± {fmt(e.get('valor'))} {u}."
     return r.get("texto", "")
 
@@ -206,7 +217,7 @@ def hallazgos(resultado: dict) -> list[str]:
                 cuenta[f] = cuenta.get(f, 0) + 1
         salida.append("¿Depende de quién mide o del patrón? " + ("; ".join(f"{k}: influye en {v} de {len(fv)} punto(s)" for k, v in cuenta.items())
                                                               if cuenta else f"no: ninguna fuente fue significativa en los {len(fv)} punto(s)") + ".")
-    nombres = {"sesgo": "Sesgo (desvío promedio)", "repetibilidad": "Repetibilidad", "precision_intermedia": "Precisión intermedia",
+    nombres = {"sesgo": "Sesgo (desvío promedio)", "repetibilidad": "Repetibilidad", "precision_intermedia": "Reproducibilidad intralaboratorio",
                "reproducibilidad": "Reproducibilidad"}
     for car in ("sesgo", "repetibilidad", "precision_intermedia", "reproducibilidad"):
         xs = [x for x in res if x["etapa"] == "desempeno" and x["caracteristica"] == car and x["estado"] == "APLICABLE"]
@@ -225,6 +236,8 @@ def hallazgos(resultado: dict) -> list[str]:
 def corto(r: dict) -> str:
     """Significado en pocas palabras de un resultado aplicado (para tablas)."""
     di = r.get("decision_inferencial") or ""
+    if r["etapa"] == "homocedasticidad":
+        return "Varianzas distintas" if di == "Se rechaza H0" else "Varianzas similares"
     if r["etapa"] == "normalidad":
         return "No tiene forma de campana" if di == "Se rechaza H0" else "Compatible con campana"
     if r["etapa"] == "atipicos":
@@ -239,7 +252,7 @@ def corto(r: dict) -> str:
     if r["tecnica"].startswith("Fuentes de variación"):
         inf = (r.get("estimacion") or {}).get("influyen") or []
         return ("Influye: " + ", ".join(inf)) if inf else "Ninguna fuente influye"
-    if r["tecnica"].startswith("Precisión intermedia"):
+    if r["tecnica"].startswith("Reproducibilidad intralaboratorio"):
         return "El cambio de condiciones influye" if di.startswith("Se rechaza") else "No se detecta efecto de las condiciones"
     return ""
 

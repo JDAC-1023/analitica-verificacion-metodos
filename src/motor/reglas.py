@@ -24,7 +24,7 @@ REGLAS = {
     "RM-12": ("Un valor p ≥ α se redacta como «no se rechaza H0», nunca como «se confirma».", COMPLEMENTARIA, "Especificación §11"),
     "RM-13": ("Sesgo: prueba t si no se rechaza normalidad y n ≥ 3; Wilcoxon si se rechaza (supuesto de simetría a revisar); solo estimación si n < 3.", COMPLEMENTARIA, "Eurachem (2016) §6.5"),
     "RM-14": ("Repetibilidad: varianzas intracelda agrupadas por grados de libertad.", NORMA, "ISO 5725-2:1994 ec. 20; Eurachem (2016) §6.6"),
-    "RM-15": ("Precisión intermedia: ANOVA de un factor de efectos aleatorios; varianza entre grupos negativa se toma como 0.", COMPLEMENTARIA, "Eurachem (2016) §6.6.4 y anexo C"),
+    "RM-15": ("Reproducibilidad intralaboratorio (precisión intermedia): ANOVA de un factor de efectos aleatorios; varianza entre grupos negativa se toma como 0.", COMPLEMENTARIA, "Eurachem (2016) §6.6.4 y anexo C"),
     "RM-16": ("Reproducibilidad: s_R² = s_L² + s_r²; s_L² negativo se toma como 0.", NORMA, "ISO 5725-2:1994 ec. 21–24 y §7.4.5.4"),
     "RM-17": ("Sin criterio aprobado, límite numérico y regla de decisión, el resultado queda CALCULADO_SIN_EVALUACION.", NORMA, "ISO/IEC 17025:2017 §7.1.3 y §7.8.6"),
     "RM-18": ("La no significación estadística no demuestra equivalencia ni conformidad.", COMPLEMENTARIA, "Especificación §9"),
@@ -34,6 +34,8 @@ REGLAS = {
     "RM-22": ("Dixon no se implementa: no se dispone de tablas críticas verificadas.", COMPLEMENTARIA, "Dixon (1950)"),
     "RM-23": ("Fuentes de variación: ANOVA factorial por punto (técnico, patrón, …) con interacciones solo si hay réplicas en cada combinación; la influencia se decide por el valor p.", COMPLEMENTARIA, "Montgomery (2017) cap. 5"),
     "RM-24": ("α = 0,05, confianza 95 % y Shapiro-Wilk son fijos: la decisión de las pruebas de hipótesis no es configurable; solo se configuran los límites de aceptación.", COMPLEMENTARIA, "Especificación del equipo (2026-11-01)"),
+    "RM-26": ("Ruta condicional: normal y varianzas iguales → ANOVA + Tukey; normal y varianzas distintas → Welch + Games-Howell; no normal → Kruskal-Wallis + Dunn. Homocedasticidad con Bartlett si hay normalidad y con Levene si no.", COMPLEMENTARIA, "Montgomery (2017) cap. 3"),
+    "RM-27": ("Si se detectan atípicos, se señalan, se calcula el efecto de excluirlos (sensibilidad) y la exclusión definitiva la decide una persona en una versión nueva.", NORMA, "ISO 5725-2:1994 §7.3.2"),
     "RM-25": ("Si el método cumple pero se rechazó la normalidad en alguna revisión, la conclusión es «cumple con observaciones».", COMPLEMENTARIA, "Especificación del equipo (2026-11-01)"),
 }
 

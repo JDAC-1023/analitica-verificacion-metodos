@@ -165,7 +165,7 @@ def resumen_precision(resultado: dict) -> bytes | None:
             series.setdefault(r["caracteristica"], []).append((_corto(r["agrupacion"].replace("nivel ", "")), r["estimacion"]["valor"]))
     if not series:
         return None
-    nombres = {"repetibilidad": "Repetibilidad s_r", "precision_intermedia": "Precisión intermedia s_I", "reproducibilidad": "Reproducibilidad s_R"}
+    nombres = {"repetibilidad": "Repetibilidad s_r", "precision_intermedia": "Reproducibilidad intralab. s_I", "reproducibilidad": "Reproducibilidad interlab. s_R"}
     colores = [SERIE, ACENTO, "#1baf7a"]
     etiquetas = [e for e, _ in next(iter(series.values()))]
     fig, ax = plt.subplots(figsize=(6.6, 2.7))

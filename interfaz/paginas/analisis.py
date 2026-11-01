@@ -19,6 +19,7 @@ from src.motor.configuracion import (CARACTERISTICAS, ESTADOS_CARACTERISTICA, OP
                                      ReferenciaNivel, ReglaDerivacion)
 from src.motor.datos import ErrorDatosMotor
 from src.motor.tablas_contexto import QUE_SE_COMPARA, SIGNIFICADO, medias_por_factor, resumen_fuentes
+from src.motor import flujo
 from src.motor.lenguaje import corto, en_palabras, explicar, hallazgos, resumen_global
 from src.motor.motor import ETAPAS, ejecutar
 from src.motor.plantillas import fmt, fmt_p
@@ -349,7 +350,7 @@ def _detalle_tecnico(r: dict) -> None:
         st.caption(r["texto"])
     tabla(pd.DataFrame([f for f in filas if f[1]], columns=["Campo", "Valor"]))
     if r["tabla"] and r["etapa"] != "normalidad" and len(r["tabla"]) <= 40:
-        tabla(pd.DataFrame(r["tabla"]).drop(columns=["ids"], errors="ignore"))
+        tabla(pd.DataFrame(r["tabla"]).drop(columns=["ids"], errors="ignore").map(lambda v: fmt(v) if isinstance(v, float) else ("—" if v is None else str(v))))
 
 
 def _frase_grupo(tecnica: str, xs: list[dict]) -> str:
@@ -372,6 +373,33 @@ def _frase_grupo(tecnica: str, xs: list[dict]) -> str:
         if "Sin criterio" in decs:
             txt += " *(«Sin criterio»: falta definir el límite de aceptación para decir si cumple.)*"
     return txt
+
+
+ICONO_PASO = {"ok": ":green[:material/check_circle:]", "alerta": ":orange[:material/warning:]", "falla": ":red[:material/cancel:]",
+              "info": ":gray[:material/info:]"}
+
+
+def _veredicto_y_flujo(res: dict, con_flujo: bool = True) -> None:
+    v = flujo.veredicto(res)
+    with st.container(border=True):
+        st.markdown(f"### :{v['color']}[:material/verified:] {v['titulo']}")
+        st.write(v["texto"])
+    imps = flujo.implicaciones(res)
+    for i in imps:
+        with st.container(border=True):
+            st.markdown(f"**:red[:material/cancel:] {i['caracteristica']} no cumple** — {i['que_implica']}")
+            st.markdown(f":material/build: **Qué hacer:** {i['que_hacer']}")
+    cab, filas = flujo.mapa(res)
+    if filas:
+        st.markdown("**Desempeño punto por punto** (✔ cumple · ✘ no cumple · · sin criterio)")
+        tabla(pd.DataFrame(filas, columns=cab))
+    if con_flujo:
+        with st.container(border=True):
+            st.markdown("#### :material/account_tree: Paso a paso del motor")
+            st.caption("Cada paso decide el siguiente: atípicos → normalidad → igualdad de varianzas → prueba estadística → desempeño.")
+            for n, p in enumerate(flujo.pasos(res), start=1):
+                st.markdown(f"{ICONO_PASO[p['estado']]} **{n}. {p['paso']}** — {p['texto']}"
+                            + (f"  \n:violet[→ {p['siguiente']}]" if p["siguiente"] else ""))
 
 
 def _bloque_prueba(tecnica: str, xs: list[dict], figs: dict) -> None:
@@ -412,6 +440,13 @@ def _bloque_prueba(tecnica: str, xs: list[dict], figs: dict) -> None:
             cab, filas_fv = resumen_fuentes(resultado)
             st.markdown("**¿De qué depende la variación en cada punto?** ✱ = influye (p < 0,05); % = parte de la variación total.")
             tabla(pd.DataFrame(filas_fv, columns=cab))
+            donde = [{"Punto": x["agrupacion"].replace("nivel ", "").split(" · ")[0], "Condición": d["factor"], "Comparación": d["comparacion"],
+                      "Diferencia": f"{fmt(d['diferencia'])} {x['unidad']}", "p": fmt_p(d["p"]), "Prueba": d["metodo"],
+                      "Origen probable": x["estimacion"]["causas"].get(d["factor"], "")}
+                     for x in aplicados for d in x["estimacion"].get("donde", [])]
+            if donde:
+                st.markdown("**Dónde están las diferencias y por qué** (pruebas post hoc)")
+                tabla(pd.DataFrame(donde), column_config={"Origen probable": st.column_config.TextColumn(width="large")})
             medias = medias_por_factor(resultado)
             if medias:
                 pest = st.tabs([f"Media por {n.lower()}" for n in medias] + ["Gráfico de combinaciones"])
@@ -430,13 +465,7 @@ with t_res:
     if not ejecutada:
         st.info("Ejecuta el análisis para ver los resultados por etapa.", icon=":material/play_arrow:")
     else:
-        g = resumen_global(resultado)
-        with st.container(border=True):
-            st.markdown(f"#### :{g['color']}[:material/verified:] {g['etiqueta']}")
-            st.write(g["texto"])
-            st.markdown("**Lo que encontramos**")
-            for t in hallazgos(resultado):
-                st.markdown(f"- {t}")
+        _veredicto_y_flujo(resultado)
         cols = st.columns(2)
         for col, fig in zip(cols, (graficos.resumen_sesgo(resultado), graficos.resumen_precision(resultado))):
             if fig:
@@ -475,10 +504,14 @@ with t_concl:
         st.markdown("#### Conclusiones técnicas preliminares (automáticas)")
         for etapa, nombre in ETAPAS:
             st.markdown(f"**{nombre}.** {en_palabras(resultado['conclusiones'].get(etapa, ''))}")
-        g = resumen_global(resultado)
-        with st.container(border=True):
-            st.markdown(f"##### :{g['color']}[:material/verified:] {g['etiqueta']}")
-            st.write(resultado["conclusiones"]["conclusion_final"])
+        _veredicto_y_flujo(resultado, con_flujo=False)
+        hist = [v for v in historial(repo, codigo) if v["ejecutado"]]
+        if len(hist) > 1:
+            st.markdown("**Evolución entre versiones del análisis**")
+            tabla(pd.DataFrame([{"Versión": f"v{v['version']}", "Motivo": v["motivo_cambio"] or "—",
+                                 "Cambios": "; ".join(c["campo"] for c in v["cambios"]) or "—",
+                                 "Resultado": flujo.veredicto(repo.obtener_analisis(codigo, v["version"])["resultado"])["titulo"]}
+                                for v in hist]))
         tabla(pd.DataFrame([{"Característica": f["caracteristica"], "Configuración": f["estado_configurado"], "Ejecución": f["ejecucion"],
                              "Decisión": f["decision"], "Referencia": f["referencia"]} for f in resultado["caracteristicas"]]))
         with st.expander("Qué significa cada parámetro (significado metrológico)"):

@@ -25,7 +25,7 @@ from reportlab.platypus import (BaseDocTemplate, CondPageBreak, Frame, Image, Ke
                                 PageBreak, PageTemplate, Paragraph, Spacer, Table, TableStyle)
 
 from src.modelos.estudio import Estudio
-from src.motor import graficos
+from src.motor import flujo, graficos
 from src.motor.lenguaje import DECISION, GLOBAL, en_palabras, explicar, hallazgos, que_hace
 from src.motor.plantillas import fmt, fmt_p
 from src.motor.referencias import CITAS, FUNDAMENTOS, REFERENCIAS
@@ -282,10 +282,10 @@ def _lienzo_numerado():
 FUND = [("Faltantes", ["faltantes"]), ("Mandel", ["mandel"]), ("Cochran", ["cochran"]), ("Grubbs", ["grubbs"]),
         ("Shapiro", ["shapiro_wilk"]), ("Anderson", ["anderson_darling"]), ("Lilliefors", ["lilliefors"]),
         ("Sesgo (t", ["sesgo_t"]), ("Sesgo (solo", ["sesgo_t"]), ("Sesgo (Wilcoxon", ["sesgo_wilcoxon"]),
-        ("Repetibilidad", ["repetibilidad"]), ("Precisión intermedia", ["precision_intermedia", "levene"]), ("Fuentes de variación", ["fuentes_variacion"]),
+        ("Repetibilidad", ["repetibilidad"]), ("Reproducibilidad intralaboratorio", ["precision_intermedia", "levene"]), ("Fuentes de variación", ["fuentes_variacion", "posthoc"]), ("Homocedasticidad", ["homocedasticidad"]),
         ("Reproducibilidad", ["reproducibilidad"])]
 NOMBRE_ETAPA = {"limpieza": "Limpieza y estructura", "atipicos": "Datos raros (atípicos)", "normalidad": "Forma de los datos (normalidad)",
-                "desempeno": "Desempeño del método"}
+                "homocedasticidad": "Igualdad de varianzas (homocedasticidad)", "desempeno": "Desempeño del método"}
 
 
 def fundamentos_usados(resultado: dict) -> list[str]:
@@ -370,6 +370,45 @@ def _limpieza(rep: dict) -> list:
 
 
 # ------------------------------------------------------------------ informe completo
+TONO_PASO = {"ok": ("Bien", "green"), "alerta": ("Atención", "orange"), "falla": ("No cumple", "red"), "info": ("Info", "gray")}
+
+
+def _paso_a_paso(resultado: dict) -> list:
+    filas = [["#", "Paso", "Qué se encontró", "Por lo tanto…"]]
+    for i, p in enumerate(flujo.pasos(resultado), start=1):
+        etiqueta, tono = TONO_PASO[p["estado"]]
+        filas.append([str(i), [Paragraph(f"<b>{esc(p['paso'])}</b>", E["celda"]), Spacer(1, 2), pastilla(etiqueta, tono, 2.2 * cm)],
+                      p["texto"], p["siguiente"] or "—"])
+    return [P("Paso a paso del motor (flujo de decisión)", "h3"),
+            P("Cada paso decide el siguiente: primero los datos atípicos, luego la normalidad, luego la igualdad de varianzas, y con eso "
+              "se elige la prueba estadística; al final se compara cada parámetro con su límite.", "nota"),
+            tabla(filas, [0.7 * cm, 3.3 * cm, 7.6 * cm, ANCHO - 11.6 * cm])]
+
+
+def _implicaciones(resultado: dict) -> list:
+    imps = flujo.implicaciones(resultado)
+    if not imps:
+        return []
+    return [CondPageBreak(5 * cm), P("Qué implica cada parámetro que no cumple y qué hacer", "h3"),
+            tabla([["Parámetro", "Qué implica para el método", "Qué hacer"]] + [[i["caracteristica"], i["que_implica"], i["que_hacer"]] for i in imps],
+                  [3.2 * cm, 8.4 * cm, ANCHO - 11.6 * cm])]
+
+
+def _donde(resultado: dict) -> list:
+    filas = [["Punto", "Condición", "Comparación", "Diferencia", "p", "Prueba", "Origen probable"]]
+    u = resultado["objeto"]["unidad"]
+    for r in resultado["resultados"]:
+        if r.get("caracteristica") != "fuentes_variacion" or r["estado"] != "APLICABLE":
+            continue
+        for x in r["estimacion"].get("donde", []):
+            filas.append([r["agrupacion"].replace("nivel ", "").split(" · ")[0], x["factor"], x["comparacion"], f"{fmt(x['diferencia'])} {u}",
+                          fmt_p(x["p"]), x["metodo"], r["estimacion"].get("causas", {}).get(x["factor"], "")])
+    if len(filas) == 1:
+        return []
+    return [Spacer(1, 4), P("Dónde están las diferencias y por qué se originan (pruebas post hoc)", "h3"),
+            tabla(filas[:41], [1.6 * cm, 1.8 * cm, 2.6 * cm, 2.2 * cm, 1.6 * cm, 2.2 * cm, ANCHO - 12 * cm])]
+
+
 def generar_informe(resultado: dict, config: dict, estudio: Estudio, comentarios: list[dict], historial: list[dict],
                     bitacora: list[dict], control: dict, limpieza: dict | None = None) -> bytes:
     meta = resultado["meta"]
@@ -409,10 +448,15 @@ def generar_informe(resultado: dict, config: dict, estudio: Estudio, comentarios
 
     # ---------- 1. resumen para todos
     h += seccion("1", "Resumen en lenguaje sencillo", "Para cualquier lector: qué se evaluó, qué se encontró y qué significa")
-    h.append(caja(resultado["conclusiones"]["conclusion_final"], f"Conclusión: {veredicto}", tono_final))
+    v = flujo.veredicto(resultado)
+    h.append(caja(v["texto"], v["titulo"], {"green": "green", "red": "red", "orange": "orange"}.get(v["color"], "gray")))
     h.append(Spacer(1, 6))
-    h.append(P("Lo que encontramos", "h3"))
-    h += [P("• " + t) for t in hallazgos(resultado)]
+    h += _paso_a_paso(resultado)
+    cab_m, filas_m = flujo.mapa(resultado)
+    if filas_m:
+        h += [CondPageBreak(5 * cm), P("Desempeño punto por punto (✔ cumple · ✘ no cumple · · sin criterio)", "h3"),
+              tabla([cab_m] + filas_m, [2 * cm] + [(ANCHO - 2 * cm) / (len(cab_m) - 1)] * (len(cab_m) - 1))]
+    h += _implicaciones(resultado)
     h.append(Spacer(1, 6))
     caracts = [x for x in resultado["caracteristicas"] if x["estado_configurado"] in ("REQUERIDA", "SELECCIONADA")]
     if caracts:
@@ -458,7 +502,7 @@ def generar_informe(resultado: dict, config: dict, estudio: Estudio, comentarios
 
     # ---------- 4. resultados por etapa
     h += [PageBreak()] + seccion("4", "Resultados por etapa", "Conclusión automática, explicación sencilla, detalle técnico y comentarios del revisor")
-    for n, etapa in enumerate(("limpieza", "atipicos", "normalidad", "desempeno"), start=1):
+    for n, etapa in enumerate(("limpieza", "atipicos", "normalidad", "homocedasticidad", "desempeno"), start=1):
         h += [CondPageBreak(6 * cm), P(f"4.{n}  {NOMBRE_ETAPA[etapa]}", "h2"),
               caja(en_palabras(resultado["conclusiones"].get(etapa, "")), "Conclusión preliminar (automática)")]
         rs = [x for x in resultado["resultados"] if x["etapa"] == etapa]
@@ -467,8 +511,8 @@ def generar_informe(resultado: dict, config: dict, estudio: Estudio, comentarios
             h += [P("Qué se compara en esta etapa", "h3"), tabla([["Elemento", "Qué se compara", "Con qué"]] + comp,
                                                                   [3.6 * cm, 6.8 * cm, ANCHO - 10.4 * cm]), Spacer(1, 4)]
         if etapa == "desempeno":
-            for car, titulo in (("sesgo", "Sesgo"), ("repetibilidad", "Repetibilidad"), ("precision_intermedia", "Precisión intermedia"),
-                                ("reproducibilidad", "Reproducibilidad")):
+            for car, titulo in (("sesgo", "Sesgo"), ("repetibilidad", "Repetibilidad"), ("precision_intermedia", "Reproducibilidad intralaboratorio (precisión intermedia)"),
+                                ("reproducibilidad", "Reproducibilidad interlaboratorio")):
                 bloque = _tabla_desempeno(resultado, car)
                 if bloque:
                     h += [P(titulo, "h3"), P(que_hace(titulo), "nota")] + bloque
@@ -487,6 +531,7 @@ def generar_informe(resultado: dict, config: dict, estudio: Estudio, comentarios
                 fig = graficos.interaccion_grid(resultado)
                 if fig:
                     h += [Spacer(1, 4), P("Medias por combinación en cada punto (líneas paralelas = sin interacción)", "h3"), imagen(fig, 16.5)]
+                h += _donde(resultado)
                 ej = cruce(resultado)
                 if ej:
                     h += [Spacer(1, 4), P(f"Ejemplo de tabla cruzada en {ej[0]} (media por combinación)", "h3"),
@@ -555,7 +600,10 @@ def generar_informe(resultado: dict, config: dict, estudio: Estudio, comentarios
     else:
         h.append(caja("El laboratorio no ha definido criterios de aceptación para este análisis. Por eso los resultados se presentan "
                       "como «calculados sin criterio»: no se declara cumplimiento ni incumplimiento.", "Sin criterios", "orange"))
-    h += [Spacer(1, 8), caja(resultado["conclusiones"]["conclusion_final"], f"Conclusión técnica final: {veredicto}", tono_final)]
+    vf = flujo.veredicto(resultado)
+    h += [Spacer(1, 8), caja(vf["texto"] + " " + resultado["conclusiones"]["conclusion_final"], f"Conclusión técnica final: {vf['titulo']}",
+                             {"green": "green", "red": "red", "orange": "orange"}.get(vf["color"], "gray"))]
+    h += _implicaciones(resultado)
     if coment.get("conclusiones"):
         h += [P("Observaciones del revisor", "h3"), tabla([["Fecha", "Usuario", "Comentario"]] +
                                                           [[c["fecha"][:16].replace("T", " "), c["usuario"], c["texto"]] for c in coment["conclusiones"]],

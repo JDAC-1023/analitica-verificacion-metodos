@@ -248,7 +248,7 @@ def _repetibilidad(ctx: Contexto) -> None:
 def _precision_intermedia(ctx: Contexto) -> None:
     cfg = ctx.cfg
     if not cfg.factores_precision_intermedia:
-        ctx.nuevo(ETAPA, "Precisión intermedia", "todos los niveles", DATOS_INSUFICIENTES, caracteristica="precision_intermedia",
+        ctx.nuevo(ETAPA, "Reproducibilidad intralaboratorio", "todos los niveles", DATOS_INSUFICIENTES, caracteristica="precision_intermedia",
                   origen_regla=COMPLEMENTARIA, motivos=["No se declararon los factores que cambian (día, técnico…)."])
         return
     nombres = ", ".join(nombre_campo(ctx.e, f) for f in cfg.factores_precision_intermedia)
@@ -257,7 +257,7 @@ def _precision_intermedia(ctx: Contexto) -> None:
         agr = f"nivel {punto}"
         c = ctx.celdas(g)
         if len(c) < 2 or int((c["n"] - 1).sum()) < 1:
-            ctx.nuevo(ETAPA, "Precisión intermedia", agr, DATOS_INSUFICIENTES, caracteristica="precision_intermedia",
+            ctx.nuevo(ETAPA, "Reproducibilidad intralaboratorio", agr, DATOS_INSUFICIENTES, caracteristica="precision_intermedia",
                       punto_id=punto_id, n=len(g), origen_regla=COMPLEMENTARIA,
                       motivos=[f"Se necesitan ≥ 2 grupos de {nombres} y al menos un grupo con réplicas (grupos={len(c)})."])
             continue
@@ -288,7 +288,7 @@ def _precision_intermedia(ctx: Contexto) -> None:
         if lev and not math.isnan(lev["p"]):
             lim.append(f"Levene (mediana): W={P.fmt(lev['estadistico'])}, p={P.fmt_p(lev['p'])} → "
                        + ("se rechaza la homogeneidad de varianzas." if lev["p"] < cfg.alfa else "no se rechaza la homogeneidad de varianzas."))
-        ctx.nuevo(ETAPA, "Precisión intermedia (s_I, ANOVA)", agr, APLICABLE, caracteristica="precision_intermedia",
+        ctx.nuevo(ETAPA, "Reproducibilidad intralaboratorio (s_I, ANOVA)", agr, APLICABLE, caracteristica="precision_intermedia",
                   punto_id=punto_id, n=len(g), incluidas=list(g["medicion_id"]), origen_regla=COMPLEMENTARIA,
                   referencia="Eurachem (2016) §6.6.4 y anexo C; Satterthwaite (1946)",
                   formula="s_b² = máx(0, (MSB − MSW)/n0); s_I² = MSW + s_b²", gl=a["gl_sI"], ic=ic,
@@ -300,7 +300,7 @@ def _precision_intermedia(ctx: Contexto) -> None:
                                         else "No se rechaza H0 (no demuestra ausencia de efecto)") if a["p_F"] is not None else "—",
                   tabla=[{"grupo": r.celda, "n": int(r.n), "media": r.media, "s": r.s} for r in c.itertuples()],
                   limitaciones=lim, graficos=[f"puntos:{punto_id}"],
-                  texto=P.render(P.PRECISION, tipo_precision="la precisión intermedia", variable=ctx.obs.nombre_objeto, nivel=punto,
+                  texto=P.render(P.PRECISION, tipo_precision="la reproducibilidad intralaboratorio (precisión intermedia)", variable=ctx.obs.nombre_objeto, nivel=punto,
                                  n=len(g), condiciones=f"cambiando {nombres}", estimacion=f"s_I={P.fmt(sI)}", unidad=ctx.obs.unidad,
                                  ic=P.ic_txt(ic, ctx.obs.unidad), gl=P.fmt(a["gl_sI"], 3),
                                  procedimiento="ANOVA de un factor de efectos aleatorios", criterio="{criterio}", decision="{estado}"))
@@ -309,17 +309,18 @@ def _precision_intermedia(ctx: Contexto) -> None:
 def _reproducibilidad(ctx: Contexto) -> None:
     cfg = ctx.cfg
     if not cfg.es_interlaboratorio:
-        ctx.nuevo(ETAPA, "Reproducibilidad (s_R)", "todos los niveles", NO_APLICABLE, caracteristica="reproducibilidad",
-                  origen_regla=NORMA, referencia="ISO 5725-1:1994 §3.18",
-                  motivos=["El estudio no es interlaboratorio. El cambio de técnico dentro del laboratorio corresponde a "
-                           "precisión intermedia, no a reproducibilidad (RM-05)."])
+        ctx.nuevo(ETAPA, "Reproducibilidad interlaboratorio (s_R)", "todos los niveles", NO_APLICABLE, caracteristica="reproducibilidad",
+                  origen_regla=NORMA, referencia="ISO 5725-1:1994 §3.18; ISO 5725-3",
+                  motivos=["La reproducibilidad entre laboratorios necesita varios laboratorios. La reproducibilidad dentro de tu "
+                           "laboratorio (cambiando técnico, patrón o día) sí se mide: está en «Reproducibilidad intralaboratorio "
+                           "(precisión intermedia)» (RM-05)."])
         return
     for punto_id, g in ctx.niveles():
         punto = g["punto"].iloc[0]
         agr = f"nivel {punto}"
         c = ctx.celdas(g)
         if len(c) < 2 or varianza_agrupada(c)[0] is None:
-            ctx.nuevo(ETAPA, "Reproducibilidad (s_R)", agr, DATOS_INSUFICIENTES, caracteristica="reproducibilidad",
+            ctx.nuevo(ETAPA, "Reproducibilidad interlaboratorio (s_R)", agr, DATOS_INSUFICIENTES, caracteristica="reproducibilidad",
                       punto_id=punto_id, origen_regla=NORMA, motivos=["Se necesitan ≥ 2 laboratorios y réplicas dentro de laboratorio."])
             continue
         r = iso_reproducibilidad(c)
@@ -328,7 +329,7 @@ def _reproducibilidad(ctx: Contexto) -> None:
             lim.append("s_L² resultó negativo y se tomó como 0 (ISO 5725-2:1994 §7.4.5.4).")
         if r["p"] < 8:
             lim.append(f"ISO 5725-1 recomienda un número suficiente de laboratorios; aquí p={r['p']}.")
-        ctx.nuevo(ETAPA, "Reproducibilidad (s_R)", agr, APLICABLE, caracteristica="reproducibilidad", punto_id=punto_id,
+        ctx.nuevo(ETAPA, "Reproducibilidad interlaboratorio (s_R)", agr, APLICABLE, caracteristica="reproducibilidad", punto_id=punto_id,
                   n=len(g), incluidas=list(g["medicion_id"]), origen_regla=NORMA, referencia="ISO 5725-2:1994 ec. 19–24",
                   formula="m̂ = Σn ȳ/Σn; s_d² = Σn(ȳ − m̂)²/(p−1); s_L² = (s_d² − s_r²)/n̄; s_R² = s_L² + s_r²",
                   gl=r["gl_r"], estimacion={"nombre": "s_R", "valor": r["s_R"], "unidad": ctx.obs.unidad, **r},

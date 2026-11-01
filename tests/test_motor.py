@@ -253,11 +253,11 @@ def test_intralaboratorio_no_aplica_cochran_ni_reproducibilidad():
     cfg = cfg_intra(e, [])
     cfg.caracteristicas.append(CaracteristicaConfig("reproducibilidad", "SELECCIONADA"))
     r = ejecutar(t, e, cfg)
-    for tec in ("Cochran", "Mandel h y k", "Reproducibilidad"):
+    for tec in ("Cochran", "Mandel h y k", "Reproducibilidad interlaboratorio"):
         x = _r(r, tec)[0]
         assert x["estado"] == NO_APLICABLE
     assert "no son laboratorios" in _r(r, "Cochran")[0]["motivos"][0]
-    assert "precisión intermedia" in _r(r, "Reproducibilidad")[0]["motivos"][0]
+    assert "Reproducibilidad intralaboratorio" in _r(r, "Reproducibilidad interlaboratorio")[0]["motivos"][0]
 
 
 def test_edicion_normativa_distinta():
@@ -344,8 +344,8 @@ def test_texto_nunca_confirma_normalidad(iso):
 
 
 def test_fuentes_de_variacion_detecta_tecnico():
-    """Entrada: 2 técnicos × 2 días × 3 réplicas; el técnico T-02 mide 0,3 °C más. Esperado: el ANOVA factorial marca «Técnico» como
-    fuente que influye (p < 0,05) con la mayor contribución, no marca «Día», incluye la interacción y entrega medias por técnico."""
+    """Entrada: 2 técnicos × 2 días × 3 réplicas; el técnico T-02 mide 0,3 °C más. Esperado: «Técnico» influye (p < 0,05) con la mayor
+    contribución, «Día» no; la prueba post hoc ubica la diferencia T-01 vs T-02 ≈ 0,3 °C y explica su origen probable (operador)."""
     base = [0.10, 0.11, 0.09]
     valores = {"PT-01": base * 2 + [x + 0.3 for x in base] * 2}   # orden: técnico × día × réplica
     e, t = estudio_intra(valores)
@@ -353,8 +353,12 @@ def test_fuentes_de_variacion_detecta_tecnico():
     fv = _r(r, "Fuentes de variación")[0]
     assert fv["estado"] == APLICABLE and fv["estimacion"]["influyen"] == ["Técnico"]
     filas = {f["fuente"]: f for f in fv["estimacion"]["anova"]}
-    assert set(filas) == {"Técnico", "Día", "Técnico × Día", "Residual (repetibilidad)"}
+    assert {"Técnico", "Día", "Residual (repetibilidad)"} <= set(filas)
     assert filas["Técnico"]["contribucion_pct"] > 90
+    donde = fv["estimacion"]["donde"]                 # dónde están las diferencias (prueba post hoc de la ruta elegida)
+    assert len(donde) == 1 and donde[0]["comparacion"] in ("T-01 vs T-02", "T-02 vs T-01")
+    assert abs(donde[0]["diferencia"]) == pytest.approx(0.3, abs=0.01)
+    assert "operador" in fv["estimacion"]["causas"]["Técnico"]
     medias = {x["nivel"]: x["media"] for x in fv["estimacion"]["contexto"]["por_factor"]["Técnico"]}
     assert medias["T-02"] - medias["T-01"] == pytest.approx(0.3)
     assert fv["decision_metrologica"] == ""          # es inferencial: no se evalúa contra un criterio
@@ -368,3 +372,26 @@ def test_conforme_con_observaciones_si_no_normal():
     r = ejecutar(t, e, cfg_intra(e, crit, **kw))
     assert r["conclusion_final"]["estado"] == "CONFORME_CON_OBSERVACIONES"
     assert any("normalidad" in a for a in r["conclusion_final"]["avisos"])
+
+
+@pytest.mark.parametrize("asimetrico,ruta", [(False, "anova"), (True, "kruskal")])
+def test_ruta_condicional_de_comparacion(asimetrico, ruta):
+    """Entrada: 2 técnicos × 2 días × 5 réplicas con ruido normal o muy asimétrico. Esperado: con datos normales y varianzas similares
+    la ruta es ANOVA + Tukey; con datos no normales es Kruskal-Wallis + Dunn; la homocedasticidad usa Bartlett o Levene según el caso."""
+    from scipy import stats as st
+    n = 20
+    u = (np.arange(1, n + 1) - 0.375) / (n + 0.25)
+    z = st.expon.ppf(u) - 1 if asimetrico else st.norm.ppf(u)
+    rng = np.random.default_rng(3)
+    valores = {"PT-01": list(np.round(0.1 + rng.permutation(z) * 0.02, 5))}
+    e, t = estudio_intra(valores)
+    r = ejecutar(t, e, cfg_intra(e, []))
+    normal_res = _r(r, "Shapiro", "residuos")[0]["decision_inferencial"] == "No se rechaza H0"
+    homo = _r(r, "Homocedasticidad")[0]
+    assert homo["tecnica"] == ("Homocedasticidad (Bartlett)" if normal_res else "Homocedasticidad (Levene (mediana))")
+    fv = _r(r, "Fuentes de variación")[0]
+    if normal_res and homo["decision_inferencial"] == "No se rechaza H0":
+        assert fv["estimacion"]["ruta"] == "anova"
+    elif not normal_res:
+        assert fv["estimacion"]["ruta"] == "kruskal"
+    assert fv["estimacion"]["ruta"] == ruta

@@ -1,5 +1,7 @@
 # Cómo incorporar esta entrega (Windows · PowerShell)
 
+> **Actualización 5.0:** flujo de decisión paso a paso (atípicos → normalidad → homocedasticidad → prueba correspondiente), dónde están las diferencias y por qué, reproducibilidad intralaboratorio, veredicto «tu método sirve / no sirve» con qué implica y qué hacer.
+>
 > **Actualización 4.0:** Inicio con tarjetas para abrir cada estudio y su panel (sin selector lateral) · Testeo 1–4 rehechos: 5 lecturas por serie, errores sembrados y criterio de prueba (cumple / no cumple / con observaciones) · ANOVA de fuentes de variación (técnico × patrón) con tablas de medias · α, confianza y Shapiro-Wilk fijos; solo se configuran los límites · informe con significado metrológico y tablas de contexto.
 >
 > Si ya tenías Testeo 1–4 de la versión anterior, la app los conserva renombrados como «Testeo N (bases anteriores)» y crea los nuevos.
@@ -21,11 +23,11 @@ cd C:\ruta\a\analitica-verificacion-metodos
 git switch prototipo-alejandra
 git status                                          # que no haya cambios pendientes que te importen
 
-Expand-Archive -Path "$HOME\Downloads\entrega_v4_panel_anova.zip" -DestinationPath . -Force
+Expand-Archive -Path "$HOME\Downloads\entrega_v5_flujo_decision.zip" -DestinationPath . -Force
 
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt           # instala las 5 librerías nuevas
-python -m pytest -q                                 # deben pasar 123 pruebas
+python -m pytest -q                                 # deben pasar 126 pruebas
 streamlit run app.py
 ```
 

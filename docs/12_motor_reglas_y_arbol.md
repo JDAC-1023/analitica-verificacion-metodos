@@ -4,28 +4,25 @@
 
 ```mermaid
 flowchart TD
-  A[Conjunto preparado APROBADO] --> B{¿Objeto definido?<br/>derivado → regla a − b aprobada}
-  B -- no --> X[Error: no se ejecuta]
-  B -- sí --> C[Limpieza: faltantes vs plan, estructura n_ij, exclusiones documentadas]
-  C --> D{¿Interlaboratorio?}
-  D -- sí --> E{¿Edición = ISO 5725-2:1994?}
-  E -- no --> E0[Mandel/Cochran/Grubbs NO_APLICABLE]
-  E -- sí --> F[Mandel h,k · Cochran · Grubbs sobre medias de celda]
-  D -- no --> G[Cochran/Mandel NO_APLICABLE<br/>Grubbs por celda si n_ij ≥ 3]
-  F --> H[Normalidad: unidades del sesgo y residuos dentro de celda]
-  G --> H
-  H --> I{Sesgo activo y referencia}
-  I --> I1{n unidades ≥ 3?}
-  I1 -- no --> I2[Solo estimación]
-  I1 -- sí --> I3{¿Se rechaza normalidad?}
-  I3 -- no --> I4[t de Student + IC]
-  I3 -- sí --> I5[Wilcoxon · revisar simetría]
-  H --> J[s_r agrupada · s_I ANOVA · s_R solo interlab]
-  I2 & I4 & I5 & J --> K{¿Criterio aprobado con límite, regla y fuente,<br/>misma unidad?}
-  K -- no --> K0[CALCULADO_SIN_EVALUACION]
-  K -- estimación --> K1[CONFORME / NO_CONFORME]
-  K -- intervalo --> K2[CONFORME / NO_CONFORME / INDETERMINADO]
-  K0 & K1 & K2 --> L[Consolidado por característica → conclusión global]
+  A[Conjunto preparado APROBADO] --> B[1 · Datos: faltantes y réplicas por serie frente al plan]
+  B --> C{2 · ¿Hay datos atípicos? Grubbs por serie n ≥ 3}
+  C -- NO --> D
+  C -- SÍ --> C1[Se señalan, no se borran · sensibilidad: se recalcula sin ellos y se muestra qué decisión cambiaría]
+  C1 --> C2[Exclusión definitiva solo con causa técnica, responsable y versión 2]
+  C1 --> D{3 · ¿Datos normales? Shapiro-Wilk α = 0,05}
+  D -- SÍ --> E{4 · ¿Varianzas iguales? Bartlett}
+  D -- NO --> E2{4 · ¿Varianzas iguales? Levene mediana}
+  E -- SÍ --> F1[5 · ANOVA factorial + Tukey HSD]
+  E -- NO --> F2[5 · ANOVA de Welch + Games-Howell]
+  E2 --> F3[5 · Kruskal-Wallis + Dunn-Holm]
+  F1 & F2 & F3 --> G[¿Dónde están las diferencias y por qué? técnico / patrón / interacción]
+  D -- SÍ --> S1[6 · Sesgo: t de Student]
+  D -- NO --> S2[6 · Sesgo: Wilcoxon]
+  G & S1 & S2 --> H[7 · Repetibilidad s_r · 8 · Reproducibilidad intralaboratorio s_I · s_R solo interlaboratorio]
+  H --> K{¿Límite aprobado?}
+  K -- no --> K0[Sin criterio]
+  K -- sí --> K1[Cumple / No cumple / Indeterminado por punto]
+  K1 --> V[Veredicto: TU MÉTODO SIRVE · SIRVE CON OBSERVACIONES · NO SIRVE + qué implica y qué hacer]
 ```
 
 ## Matriz de reglas (RM-xx)
@@ -56,3 +53,8 @@ Generada desde `src/motor/reglas.py`; la misma tabla aparece en el anexo B del i
 | RM-20 | Decisión inferencial, estimación y decisión metrológica separadas. | COMPLEMENTARIA | Especificación §9 |
 | RM-21 | Ruta verificación / validación según el estado del método. | NORMA | Eurachem (2016) §4.2 |
 | RM-22 | Dixon no implementado. | COMPLEMENTARIA | Dixon (1950) |
+| RM-23 | Fuentes de variación por punto (técnico, patrón, interacción). | COMPLEMENTARIA | Montgomery (2017) |
+| RM-24 | α = 0,05, 95 % y Shapiro-Wilk fijos; solo se configuran los límites. | COMPLEMENTARIA | Especificación del equipo |
+| RM-25 | Cumple + normalidad rechazada → «cumple con observaciones». | COMPLEMENTARIA | Especificación del equipo |
+| RM-26 | Ruta condicional ANOVA/Welch/Kruskal y post hoc Tukey/Games-Howell/Dunn; Bartlett o Levene según normalidad. | COMPLEMENTARIA | Montgomery (2017) |
+| RM-27 | Atípicos: se señalan, se mide su efecto (sensibilidad) y la exclusión la decide una persona. | NORMA | ISO 5725-2:1994 §7.3.2 |

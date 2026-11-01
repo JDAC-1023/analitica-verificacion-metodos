@@ -27,7 +27,7 @@ CARACTERISTICAS = {
     # código: (nombre, implementada en esta versión, referencia)
     "sesgo": ("Veracidad / sesgo", True, "Eurachem (2016) §6.5; ISO 5725-1:1994 §3.8"),
     "repetibilidad": ("Precisión en condiciones de repetibilidad", True, "Eurachem (2016) §6.6; ISO 5725-1:1994 §3.13"),
-    "precision_intermedia": ("Precisión intermedia", True, "Eurachem (2016) §6.6.4 y anexo C"),
+    "precision_intermedia": ("Reproducibilidad intralaboratorio (precisión intermedia)", True, "Eurachem (2016) §6.6.3–6.6.4 y anexo C; ISO 5725-3"),
     "reproducibilidad": ("Reproducibilidad interlaboratorio", True, "ISO 5725-2:1994 §7.4"),
     "linealidad": ("Linealidad / intervalo de trabajo", False, "Eurachem (2016) §6.3"),
     "lod_loq": ("Límites de detección y cuantificación", False, "Eurachem (2016) §6.2"),

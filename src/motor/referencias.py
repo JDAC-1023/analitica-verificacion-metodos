@@ -28,6 +28,13 @@ REFERENCIAS = {
     "levene": "Levene, H. (1960). Robust tests for equality of variances. En I. Olkin (Ed.), *Contributions to probability and statistics* (pp. 278–292). Stanford University Press.",
     "brown_forsythe": "Brown, M. B., & Forsythe, A. B. (1974). Robust tests for the equality of variances. *Journal of the American Statistical Association, 69*(346), 364–367. https://doi.org/10.1080/01621459.1974.10482955",
     "satterthwaite": "Satterthwaite, F. E. (1946). An approximate distribution of estimates of variance components. *Biometrics Bulletin, 2*(6), 110–114. https://doi.org/10.2307/3002019",
+    "bartlett": "Bartlett, M. S. (1937). Properties of sufficiency and statistical tests. *Proceedings of the Royal Society of London. Series A, 160*(901), 268–282. https://doi.org/10.1098/rspa.1937.0109",
+    "welch": "Welch, B. L. (1951). On the comparison of several mean values: An alternative approach. *Biometrika, 38*(3–4), 330–336. https://doi.org/10.1093/biomet/38.3-4.330",
+    "kruskal": "Kruskal, W. H., & Wallis, W. A. (1952). Use of ranks in one-criterion variance analysis. *Journal of the American Statistical Association, 47*(260), 583–621. https://doi.org/10.1080/01621459.1952.10483441",
+    "dunn": "Dunn, O. J. (1964). Multiple comparisons using rank sums. *Technometrics, 6*(3), 241–252. https://doi.org/10.1080/00401706.1964.10490181",
+    "games_howell": "Games, P. A., & Howell, J. F. (1976). Pairwise multiple comparison procedures with unequal n's and/or variances: A Monte Carlo study. *Journal of Educational Statistics, 1*(2), 113–125. https://doi.org/10.3102/10769986001002113",
+    "tukey": "Tukey, J. W. (1949). Comparing individual means in the analysis of variance. *Biometrics, 5*(2), 99–114. https://doi.org/10.2307/3001913",
+    "holm": "Holm, S. (1979). A simple sequentially rejective multiple test procedure. *Scandinavian Journal of Statistics, 6*(2), 65–70.",
     "montgomery": "Montgomery, D. C. (2017). *Design and analysis of experiments* (9.ª ed.). John Wiley & Sons.",
     "scipy": "Virtanen, P., Gommers, R., Oliphant, T. E., et al. (2020). SciPy 1.0: Fundamental algorithms for scientific computing in Python. *Nature Methods, 17*, 261–272. https://doi.org/10.1038/s41592-019-0686-2",
     "statsmodels": "Seabold, S., & Perktold, J. (2010). Statsmodels: Econometric and statistical modeling with Python. En *Proceedings of the 9th Python in Science Conference* (pp. 92–96). https://doi.org/10.25080/Majora-92bf1922-011",
@@ -108,12 +115,13 @@ FUNDAMENTOS = {
         "refs": ["iso5725_2", "eurachem"],
     },
     "precision_intermedia": {
-        "titulo": "Precisión intermedia mediante ANOVA de un factor",
+        "titulo": "Reproducibilidad intralaboratorio (precisión intermedia) mediante ANOVA",
         "texto": ("Con un diseño de grupos (días, técnicos u otras condiciones cambiantes dentro del laboratorio) analizado mediante ANOVA "
                   "de un factor de efectos aleatorios, la repetibilidad es la precisión dentro del grupo y la precisión intermedia es la raíz de "
                   "la suma de las varianzas dentro y entre grupos (Eurachem, 2016, §6.6.4 y anexo C). Si la estimación de la varianza entre "
-                  "grupos resulta negativa se toma como cero. Los grados de libertad de s_I se aproximan por Satterthwaite. El cambio de "
-                  "técnico dentro de un laboratorio no se denomina reproducibilidad en el sentido de ISO 5725-2."),
+                  "grupos resulta negativa se toma como cero. Los grados de libertad de s_I se aproximan por Satterthwaite. "
+                  "Mide la reproducibilidad dentro del laboratorio (ISO 5725-3 la llama precisión intermedia); la reproducibilidad entre "
+                  "laboratorios de ISO 5725-2 es otra magnitud y exige un estudio interlaboratorio."),
         "refs": ["eurachem", "montgomery", "satterthwaite"],
     },
     "reproducibilidad": {
@@ -121,6 +129,21 @@ FUNDAMENTOS = {
         "texto": ("Solo en estudios interlaboratorio: s_R² = s_L² + s_r², con s_L² = (s_d² − s_r²)/n̄ (ISO 5725-2:1994, ec. 21–24); "
                   "si s_L² resulta negativo se toma como cero (§7.4.5.4)."),
         "refs": ["iso5725_2"],
+    },
+    "homocedasticidad": {
+        "titulo": "Igualdad de varianzas (homocedasticidad): Bartlett o Levene",
+        "texto": ("Antes de comparar técnicos y patrones se comprueba si las series tienen dispersiones parecidas. Si los residuos son normales "
+                  "se usa la prueba de Bartlett, más potente en ese caso; si no lo son, la de Levene centrada en la mediana (Brown-Forsythe), "
+                  "que no depende de la normalidad. H0: todas las varianzas son iguales. El resultado decide la prueba siguiente: con varianzas "
+                  "iguales, ANOVA clásico; con varianzas distintas, ANOVA de Welch."),
+        "refs": ["bartlett", "levene", "brown_forsythe", "montgomery"],
+    },
+    "posthoc": {
+        "titulo": "Dónde están las diferencias: pruebas post hoc",
+        "texto": ("Cuando un factor influye, se compara cada par de niveles para saber exactamente cuáles difieren, controlando el error por "
+                  "comparaciones múltiples. La prueba depende de la ruta: Tukey HSD tras un ANOVA clásico (normalidad y varianzas iguales); "
+                  "Games-Howell tras un ANOVA de Welch (varianzas distintas); Dunn con ajuste de Holm tras Kruskal-Wallis (datos no normales)."),
+        "refs": ["tukey", "welch", "games_howell", "kruskal", "dunn", "holm"],
     },
     "fuentes_variacion": {
         "titulo": "Fuentes de variación: ANOVA factorial (técnico × patrón)",
@@ -155,5 +178,6 @@ CITAS = {
     "lilliefors": "Lilliefors, 1967", "grubbs1969": "Grubbs, 1969", "grubbs1972": "Grubbs & Beck, 1972",
     "cochran": "Cochran, 1941", "mandel": "Mandel, 1964", "student": "Student, 1908", "wilcoxon": "Wilcoxon, 1945",
     "levene": "Levene, 1960", "brown_forsythe": "Brown & Forsythe, 1974", "satterthwaite": "Satterthwaite, 1946",
-    "montgomery": "Montgomery, 2017", "scipy": "Virtanen et al., 2020", "statsmodels": "Seabold & Perktold, 2010",
+    "montgomery": "Montgomery, 2017", "bartlett": "Bartlett, 1937", "welch": "Welch, 1951", "kruskal": "Kruskal & Wallis, 1952",
+    "dunn": "Dunn, 1964", "games_howell": "Games & Howell, 1976", "tukey": "Tukey, 1949", "holm": "Holm, 1979", "scipy": "Virtanen et al., 2020", "statsmodels": "Seabold & Perktold, 2010",
 }

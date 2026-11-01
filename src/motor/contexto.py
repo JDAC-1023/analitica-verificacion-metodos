@@ -23,6 +23,7 @@ class Contexto:
     resultados: list[ResultadoAnalisis] = field(default_factory=list)
     arbol: list[NodoDecision] = field(default_factory=list)
     normalidad: dict = field(default_factory=dict)   # (objeto, punto_id) -> "rechaza" | "no_rechaza" | None
+    homocedasticidad: dict = field(default_factory=dict)   # punto_id -> "rechaza" | "no_rechaza" | None
     _n: int = 0
 
     def nuevo(self, etapa: str, tecnica: str, agrupacion: str, estado: str, **kw) -> ResultadoAnalisis:

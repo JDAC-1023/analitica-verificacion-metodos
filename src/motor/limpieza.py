@@ -81,8 +81,8 @@ def ejecutar(ctx: Contexto, tablas: dict) -> None:
               estimacion={"nombre": "series_distintas_al_plan", "valor": len(filas_s), "unidad": "series", "series": int(len(t))},
               tabla=filas_s, decision_inferencial="No aplica.",
               limitaciones=[f"{len(filas_s)} serie(s) no tienen el número planificado de lecturas; se analizan con las que hay."] if filas_s else [],
-              texto=(f"Se revisaron {len(t)} series. " + (f"{len(filas_s)} no tienen el número planificado de lecturas: "
-                     + "; ".join(f"{f['punto']} · {f['serie']}: {f['válidas']} de {f['planificadas']}" for f in filas_s[:6]) + "."
+              texto=(f"Se revisaron {len(t)} series. " + (f"{len(filas_s)} serie(s) sin el número planificado de lecturas: "
+                     + "; ".join(f"{f['punto'].split(' · ')[0]} · {f['serie']}: {f['válidas']} de {f['planificadas']}" for f in filas_s[:6]) + "."
                      if filas_s else "Todas tienen exactamente las lecturas planificadas.")))
     # estructura
     filas = [{"nivel": d["punto"], "p_j": d["p_j"], "n_ij": ", ".join(f"{k}: {v}" for k, v in d["n_ij"].items()),

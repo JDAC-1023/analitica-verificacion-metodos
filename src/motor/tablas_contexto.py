@@ -14,11 +14,11 @@ SIGNIFICADO = [
     ("Repetibilidad (s_r)", "Dispersión entre lecturas repetidas con el mismo técnico, el mismo patrón y en el mismo momento.",
      "Es la mejor precisión que puede dar el método. Si es grande, el método no es estable ni en las condiciones más favorables.",
      "ISO 5725-1 §3.13; ISO 5725-2 ec. 20"),
-    ("Precisión intermedia (s_I)", "Dispersión total cuando cambian condiciones dentro del laboratorio (técnico, patrón, día).",
+    ("Reproducibilidad intralaboratorio (s_I, precisión intermedia)", "Dispersión total cuando cambian condiciones dentro del laboratorio (técnico, patrón, día).",
      "Refleja la variación real de la rutina. Si es mucho mayor que s_r, alguna condición (quién mide o con qué patrón) pesa.",
      "Eurachem (2016) §6.6.4"),
-    ("Reproducibilidad (s_R)", "Dispersión entre laboratorios distintos que aplican el mismo método.",
-     "Solo existe en estudios interlaboratorio; con técnicos de un mismo laboratorio no se calcula.", "ISO 5725-2 §7.4"),
+    ("Reproducibilidad interlaboratorio (s_R)", "Dispersión entre laboratorios distintos que aplican el mismo método.",
+     "Solo existe en estudios interlaboratorio; dentro de un laboratorio se usa la reproducibilidad intralaboratorio.", "ISO 5725-2 §7.4"),
     ("Fuentes de variación (ANOVA)", "Comparación de los resultados entre técnicos, entre patrones y su combinación.",
      "Dice si el método es sensible a quién mide o al patrón usado. Una fuente que «influye» debe controlarse o incluirse en la incertidumbre.",
      "Montgomery (2017) cap. 5"),
@@ -39,7 +39,7 @@ QUE_SE_COMPARA = {
                    ["Residuos", "La forma de las diferencias de cada lectura a su promedio de serie", "Una distribución normal (campana)"]],
     "desempeno": [["Sesgo", "Promedio de la corrección en cada punto", "El valor de referencia (0) y el límite de aceptación"],
                   ["Repetibilidad", "Dispersión dentro de cada serie", "El límite de repetibilidad"],
-                  ["Precisión intermedia", "Dispersión total al cambiar técnico y patrón", "El límite de precisión intermedia"],
+                  ["Reproducibilidad intralaboratorio", "Dispersión total al cambiar técnico y patrón", "El límite de reproducibilidad intralaboratorio"],
                   ["Fuentes de variación", "Promedios entre técnicos, entre patrones y su combinación", "La variación entre réplicas (prueba F)"]],
 }
 

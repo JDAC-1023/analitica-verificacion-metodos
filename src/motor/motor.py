@@ -1,6 +1,6 @@
 """Orquestador del motor estadístico.
 
-Orden: limpieza → atípicos → normalidad → desempeño → criterios → consolidación.
+Orden: limpieza → atípicos → normalidad → homocedasticidad → desempeño (pruebas según la ruta) → criterios → consolidación.
 Devuelve un diccionario serializable con los resultados por etapa, el árbol de
 decisiones, las conclusiones preliminares automáticas y los datos usados.
 """
@@ -15,7 +15,7 @@ import scipy
 
 from src.auditoria.huella import ahora_iso, json_canonico, sha256_bytes
 from src.modelos.estudio import Estudio
-from src.motor import atipicos, caracteristicas, criterios, desempeno, limpieza, normalidad
+from src.motor import atipicos, caracteristicas, criterios, desempeno, limpieza, normalidad, supuestos
 from src.motor import plantillas as P
 from src.motor.configuracion import ConfiguracionAnalisis
 from src.motor.contexto import Contexto
@@ -26,7 +26,8 @@ from src.motor.resultado import (APLICABLE, CONFORME, DATOS_INSUFICIENTES, INDET
 
 VERSION_MOTOR = "1.0.0"
 ETAPAS = [("limpieza", "Limpieza y estructura"), ("atipicos", "Valores atípicos y consistencia"),
-          ("normalidad", "Normalidad"), ("desempeno", "Desempeño y evaluación")]
+          ("normalidad", "Normalidad"), ("homocedasticidad", "Homocedasticidad (igualdad de varianzas)"),
+          ("desempeno", "Desempeño y evaluación")]
 
 
 def ejecutar(tablas: dict, e: Estudio, cfg: ConfiguracionAnalisis, meta: dict | None = None) -> dict:
@@ -39,6 +40,7 @@ def ejecutar(tablas: dict, e: Estudio, cfg: ConfiguracionAnalisis, meta: dict | 
     else:
         atipicos.ejecutar(ctx)
         normalidad.ejecutar(ctx)
+        supuestos.ejecutar(ctx)
         desempeno.ejecutar(ctx)
         criterios.ejecutar(ctx)
     filas = caracteristicas.consolidar(ctx)
@@ -64,9 +66,52 @@ def ejecutar(tablas: dict, e: Estudio, cfg: ConfiguracionAnalisis, meta: dict | 
         if len(obs.excluidas) else [],
         "reglas": matriz(),
     }
+    if not (meta or {}).get("sensibilidad") and len(obs.df):
+        salida["sensibilidad"] = sensibilidad(tablas, e, cfg, ctx, salida)
     salida = limpio(salida)
     salida["meta"]["huella_resultado"] = sha256_bytes(json_canonico({k: v for k, v in salida.items() if k != "meta"}).encode())
     return salida
+
+
+def sensibilidad(tablas: dict, e: Estudio, cfg: ConfiguracionAnalisis, ctx: Contexto, salida: dict) -> dict | None:
+    """¿Qué pasa con los atípicos? Se recalcula SIN ellos solo para comparar (no es una exclusión) (RM-27)."""
+    marcados = []
+    for r in ctx.resultados:
+        if r.etapa != "atipicos" or r.estado != APLICABLE:
+            continue
+        for f in r.tabla:
+            if f.get("medicion_id") and f.get("clasificacion") in (atipicos.REZAGADO, atipicos.ATIPICO):
+                marcados.append({"medicion_id": f["medicion_id"], "serie": r.agrupacion.replace("nivel ", ""),
+                                 "clasificacion": f["clasificacion"], "valor": f.get("valor"), "G": f.get("G")})
+    if not marcados:
+        ctx.decidir("¿Hay datos atípicos?", "NO", "Ninguna lectura fue señalada: se continúa con todos los datos.", "RM-27")
+        return {"marcados": [], "cambios": [], "cambia_conclusion": False}
+    ya = {x.medicion_id for x in cfg.exclusiones}
+    nuevos = [m for m in marcados if m["medicion_id"] not in ya]
+    from src.motor.configuracion import Exclusion
+    cfg2 = ConfiguracionAnalisis.from_dict(cfg.to_dict())
+    cfg2.exclusiones = list(cfg.exclusiones) + [Exclusion(m["medicion_id"], "Análisis de sensibilidad (no es una exclusión)", "motor",
+                                                          origen="sensibilidad") for m in nuevos]
+    sin = ejecutar(tablas, e, cfg2, {"sensibilidad": True})
+    def mapa(res):
+        return {(f["codigo"], n["nivel"]): n for f in res["caracteristicas"] for n in f["niveles"]}
+    con_m, sin_m = mapa(salida), mapa(sin)
+    cambios = []
+    for clave, n in con_m.items():
+        m = sin_m.get(clave)
+        if not m or n["valor"] is None or m["valor"] is None:
+            continue
+        if n["decision"] != m["decision"] or abs(n["valor"] - m["valor"]) > 1e-12:
+            cambios.append({"caracteristica": clave[0], "nivel": clave[1].replace("nivel ", ""), "valor_con": n["valor"],
+                            "valor_sin": m["valor"], "decision_con": n["decision"], "decision_sin": m["decision"],
+                            "cambia_decision": n["decision"] != m["decision"]})
+    cambia = sin["conclusion_final"]["estado"] != salida["conclusion_final"]["estado"]
+    ctx.decidir("¿Hay datos atípicos?", "SI",
+                f"{len(marcados)} lectura(s) señalada(s). Sin ellas, {sum(c['cambia_decision'] for c in cambios)} decisión(es) cambiaría(n)"
+                f"{' y la conclusión global pasaría a ' + sin['conclusion_final']['estado'] if cambia else '; la conclusión global no cambia'}. "
+                "Se continúa con todos los datos: excluir requiere causa técnica, responsable y versión nueva.", "RM-27")
+    return {"marcados": marcados, "cambios": cambios, "cambia_conclusion": cambia,
+            "conclusion_sin": sin["conclusion_final"]["estado"]}
 
 
 def _cuenta(res, etapa):
@@ -132,8 +177,8 @@ def conclusiones_por_etapa(ctx: Contexto, final: dict) -> dict:
             decs[x.decision_metrologica or "—"] = decs.get(x.decision_metrologica or "—", 0) + 1
         rutas = sorted({x.tecnica for x in xs})
         rango = P.fmt(vals[0]) if len(vals) == 1 else f"de {P.fmt(min(vals))} a {P.fmt(max(vals))}"
-        car = {"sesgo": "Sesgo", "repetibilidad": "Repetibilidad", "precision_intermedia": "Precisión intermedia",
-               "reproducibilidad": "Reproducibilidad"}.get(xs[0].caracteristica, nombre)
+        car = {"sesgo": "Sesgo", "repetibilidad": "Repetibilidad", "precision_intermedia": "Reproducibilidad intralaboratorio",
+               "reproducibilidad": "Reproducibilidad interlaboratorio"}.get(xs[0].caracteristica, nombre)
         metodos = ", ".join(r.split("(")[-1].rstrip(")") for r in rutas)
         partes.append(f"{car} ({nombre}; método: {metodos}) en {len(xs)} punto(s): {rango} {unidad} → "
                       + ", ".join(f"{k}: {v}" for k, v in decs.items()))

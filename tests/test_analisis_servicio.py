@@ -107,3 +107,29 @@ def test_crear_estudios_de_prueba(repo):
     fv = [y for y in r1["resultados"] if y["caracteristica"] == "fuentes_variacion" and y["estado"] == "APLICABLE"]
     assert len(fv) == 8 and all("Técnico" in y["estimacion"]["influyen"] for y in fv)
     assert all("omitido" in x for x in crear_estudios_prueba(repo, "ana"))
+
+
+def test_flujo_condicional_y_veredicto(repo):
+    """Entrada: Testeo 1–4. Esperado: el paso a paso sigue el orden datos → atípicos → normalidad → homocedasticidad → comparación de
+    condiciones → sesgo → repetibilidad → reproducibilidad intralaboratorio → veredicto; el veredicto dice si el método sirve; en el
+    Testeo 1 el atípico sembrado explica el incumplimiento de repetibilidad en −20 °C (sensibilidad) y el técnico T-03 aparece como
+    origen de las diferencias."""
+    from src.motor import flujo
+    from src.servicios.estudios_prueba import crear_estudios_prueba
+    creados = crear_estudios_prueba(repo, "ana")
+    titulos = []
+    for x in creados:
+        r = repo.obtener_analisis(x["codigo"], 1)["resultado"]
+        pasos = [p["paso"] for p in flujo.pasos(r)]
+        assert pasos == ["Datos", "¿Hay datos atípicos?", "¿Los datos son normales?", "¿Las varianzas son iguales (homocedasticidad)?",
+                         "¿El resultado depende del técnico o del patrón?", "Sesgo (veracidad)", "Repetibilidad",
+                         "Reproducibilidad intralaboratorio", "Veredicto"]
+        titulos.append(flujo.veredicto(r)["titulo"])
+    assert titulos == ["TU MÉTODO NO SIRVE (TODAVÍA)", "TU MÉTODO SIRVE", "TU MÉTODO NO SIRVE (TODAVÍA)", "TU MÉTODO SIRVE, CON OBSERVACIONES"]
+    r1 = repo.obtener_analisis(creados[0]["codigo"], 1)["resultado"]
+    cambio = [c for c in r1["sensibilidad"]["cambios"] if c["cambia_decision"]]
+    assert cambio and cambio[0]["caracteristica"] == "repetibilidad" and cambio[0]["decision_sin"] == "CONFORME"
+    imps = {i["caracteristica"]: i for i in flujo.implicaciones(r1)}
+    assert "corridos" in imps["Sesgo (veracidad)"]["que_implica"] and "atípico" in imps["Repetibilidad"]["que_implica"]
+    donde = [d for y in r1["resultados"] if y.get("caracteristica") == "fuentes_variacion" for d in y["estimacion"].get("donde", [])]
+    assert donde and all(d["factor"] in ("Técnico", "Patrón") for d in donde) and any("T-03" in d["comparacion"] for d in donde)
