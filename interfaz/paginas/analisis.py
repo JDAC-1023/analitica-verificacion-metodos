@@ -18,6 +18,7 @@ from src.motor.configuracion import (CARACTERISTICAS, ESTADOS_CARACTERISTICA, OP
                                      REGLAS_DECISION, CaracteristicaConfig, ConfiguracionAnalisis, CriterioMotor, Exclusion,
                                      ReferenciaNivel, ReglaDerivacion)
 from src.motor.datos import ErrorDatosMotor
+from src.motor.tablas_contexto import QUE_SE_COMPARA, SIGNIFICADO, medias_por_factor, resumen_fuentes
 from src.motor.lenguaje import corto, en_palabras, explicar, hallazgos, resumen_global
 from src.motor.motor import ETAPAS, ejecutar
 from src.motor.plantillas import fmt, fmt_p
@@ -78,6 +79,14 @@ t_conf, t_res, t_concl, t_red, t_inf, t_hist = st.tabs(
 
 
 # ------------------------------------------------------------------ 1 · configurar
+def _unidad_objeto(e, tipo: str, objeto: str, regla) -> str:
+    if tipo == "variable":
+        return next((v.unidad for v in e.variables if v.id == objeto), "")
+    if tipo == "derivado" and regla is not None:
+        return next((v.unidad for v in e.variables if v.id == regla.a), "")
+    return next((r.unidad for r in e.resultados if r.id == objeto), "")
+
+
 def _formulario(cfg0: ConfiguracionAnalisis, bloqueado: bool) -> ConfiguracionAnalisis | None:
     k = lambda n: f"{n}_{clave}"  # noqa: E731
     ids_prep = [p["preparacion_id"] for p in preps] or [cfg0.preparacion_id]
@@ -178,42 +187,42 @@ def _formulario(cfg0: ConfiguracionAnalisis, bloqueado: bool) -> ConfiguracionAn
                                     None if pd.isna(r["u estándar"]) else float(r["u estándar"]), r["Fuente"] or "") for _, r in ed.iterrows()]
 
     with st.container(border=True):
-        st.markdown("##### :material/rule: Criterios de aceptación (sin valores por defecto)")
-        st.caption("Sin criterio aprobado, con límite, regla de decisión y fuente, el resultado queda «CALCULADO_SIN_EVALUACION».")
-        params = sorted({p for v in PARAMETROS.values() for p in v})
-        dfc = pd.DataFrame([{"Id": c.id, "Característica": c.caracteristica, "Parámetro": c.parametro, "Operador": c.operador,
-                             "Límite": c.limite, "Unidad": c.unidad, "Regla de decisión": c.regla_decision, "Fuente": c.fuente,
-                             "Aprobado": c.aprobado, "Puntos (vacío = todos)": ", ".join(c.puntos)} for c in cfg0.criterios],
-                           columns=["Id", "Característica", "Parámetro", "Operador", "Límite", "Unidad", "Regla de decisión",
-                                    "Fuente", "Aprobado", "Puntos (vacío = todos)"])
-        edc = st.data_editor(dfc, key=k("crit"), hide_index=True, width="stretch", num_rows="dynamic", disabled=bloqueado,
-                             column_config={"Característica": st.column_config.SelectboxColumn(options=list(PARAMETROS)),
-                                            "Parámetro": st.column_config.SelectboxColumn(options=params),
-                                            "Operador": st.column_config.SelectboxColumn(options=OPERADORES),
-                                            "Límite": st.column_config.NumberColumn(format="%.6g"),
-                                            "Regla de decisión": st.column_config.SelectboxColumn(options=list(REGLAS_DECISION), help=" · ".join(f"{a}: {b}" for a, b in REGLAS_DECISION.items())),
-                                            "Aprobado": st.column_config.CheckboxColumn(default=False)})
+        st.markdown("##### :material/rule: Límites de aceptación del método (lo único que decide el laboratorio)")
+        st.caption("Escribe el valor máximo aceptable de cada característica. Si lo dejas vacío, esa característica se calcula "
+                   "pero no se dice si cumple («sin criterio»). No hay valores por defecto.")
+        unidad_obj = _unidad_objeto(e, tipo, objeto, regla)
+        LIMITES = [("sesgo", "abs_sesgo", "Sesgo máximo |b| (desvío promedio permitido)"),
+                   ("repetibilidad", "s_r", "Repetibilidad máxima s_r"),
+                   ("precision_intermedia", "s_I", "Precisión intermedia máxima s_I"),
+                   ("reproducibilidad", "s_R", "Reproducibilidad máxima s_R (solo interlaboratorio)")]
+        previos = {c.caracteristica: c for c in cfg0.criterios}
+        regla_txt = {"estimacion": "Comparar el valor calculado con el límite",
+                     "intervalo": "Exigir que todo el intervalo de confianza 95 % quede dentro del límite (más estricto)"}
+        regla_dec = st.radio("¿Cómo se decide si cumple?", list(regla_txt), format_func=regla_txt.get, key=k("regla_dec"),
+                             index=1 if any(c.regla_decision == "intervalo" for c in cfg0.criterios) else 0,
+                             horizontal=True, disabled=bloqueado)
         criterios = []
-        for i, r in edc.reset_index(drop=True).iterrows():
-            if not r["Característica"]:
-                continue
-            criterios.append(CriterioMotor(r["Id"] or f"CM-{i + 1:02d}", r["Característica"], r["Parámetro"] or PARAMETROS[r["Característica"]][0],
-                                           r["Operador"] or "<=", None if pd.isna(r["Límite"]) else float(r["Límite"]),
-                                           r["Unidad"] or "", r["Regla de decisión"] or "", r["Fuente"] or "", bool(r["Aprobado"]),
-                                           [x.strip() for x in str(r["Puntos (vacío = todos)"] or "").split(",") if x.strip()]))
+        for car_cod, param, etiqueta in LIMITES:
+            c0 = previos.get(car_cod)
+            l1, l2, l3 = st.columns([2.2, 2.6, 1])
+            lim = l1.number_input(f"{etiqueta} [{unidad_obj or 'unidad del objeto'}]", min_value=0.0, value=c0.limite if c0 else None,
+                                  format="%.6g", key=k(f"lim_{car_cod}"), disabled=bloqueado, placeholder="sin límite")
+            fuente = l2.text_input("Fuente del límite", c0.fuente if c0 else "", key=k(f"fue_{car_cod}"), disabled=bloqueado,
+                                   placeholder="p. ej. procedimiento PC-07, tolerancia del cliente")
+            apr = l3.checkbox("Aprobado", c0.aprobado if c0 else False, key=k(f"apr_{car_cod}"), disabled=bloqueado)
+            if lim is not None:
+                criterios.append(CriterioMotor(c0.id if c0 else f"CM-{len(criterios) + 1:02d}", car_cod, param, "<=", float(lim),
+                                               unidad_obj, regla_dec, fuente, apr))
 
     with st.container(border=True):
-        st.markdown("##### :material/calculate: Parámetros estadísticos y responsables")
-        s1, s2, s3, s4 = st.columns(4)
-        alfa = s1.number_input("α", 0.001, 0.2, float(cfg0.alfa), 0.01, format="%.3f", key=k("alfa"), disabled=bloqueado)
-        conf = s2.number_input("Nivel de confianza (IC)", 0.80, 0.999, float(cfg0.nivel_confianza), 0.01, format="%.3f", key=k("conf"), disabled=bloqueado)
-        pn = s3.selectbox("Prueba de normalidad", PRUEBAS_NORMALIDAD, index=PRUEBAS_NORMALIDAD.index(cfg0.prueba_normalidad), key=k("pn"), disabled=bloqueado)
-        alerta = s4.number_input("Alerta de faltantes % (opcional)", 0.0, 100.0, cfg0.alerta_faltantes_pct, key=k("al"), disabled=bloqueado,
-                                 help="No es un criterio de aplicabilidad; solo genera un aviso. Vacío = sin alerta.")
-        r1, r2, r3 = st.columns(3)
-        edicion = r1.text_input("Edición normativa aplicada", cfg0.version_normativa, key=k("ed"), disabled=bloqueado)
+        st.markdown("##### :material/lock: Reglas estadísticas fijas (no configurables)")
+        st.markdown("Las pruebas de hipótesis deciden solas con su valor p; por eso estos parámetros no se cambian (RM-24):  \n"
+                    "• Nivel de significancia **α = 0,05** · • Intervalos de confianza al **95 %** · • Normalidad con **Shapiro-Wilk** · "
+                    "• Valores críticos de **ISO 5725-2:1994** · • Sesgo con **t de Student** o **Wilcoxon** según la normalidad.")
+        r2, r3 = st.columns(2)
         rev = r2.text_input("Revisor", cfg0.revisado_por, key=k("rev"), disabled=bloqueado)
         aut = r3.text_input("Autorizador", cfg0.autorizado_por, key=k("aut"), disabled=bloqueado)
+        alfa, conf, pn, alerta, edicion = 0.05, 0.95, "shapiro_wilk", None, "ISO 5725-2:1994"
 
     caracteristicas = [CaracteristicaConfig(r["codigo"], r["Estado"], r["Justificación"] or "", r["Fuente"] or "") for _, r in car.iterrows()]
     datos = cfg0.to_dict()
@@ -397,7 +406,21 @@ def _bloque_prueba(tecnica: str, xs: list[dict], figs: dict) -> None:
             df_niv = pd.DataFrame(filas)
             if not df_niv["Decisión"].astype(bool).any():
                 df_niv = df_niv.drop(columns=["Decisión"])
-            tabla(df_niv)
+            if not tecnica.startswith("Fuentes de variación"):
+                tabla(df_niv)
+        if tecnica.startswith("Fuentes de variación") and aplicados:
+            cab, filas_fv = resumen_fuentes(resultado)
+            st.markdown("**¿De qué depende la variación en cada punto?** ✱ = influye (p < 0,05); % = parte de la variación total.")
+            tabla(pd.DataFrame(filas_fv, columns=cab))
+            medias = medias_por_factor(resultado)
+            if medias:
+                pest = st.tabs([f"Media por {n.lower()}" for n in medias] + ["Gráfico de combinaciones"])
+                for pe, (n, (cab_f, filas_f)) in zip(pest, medias.items()):
+                    pe.dataframe(pd.DataFrame(filas_f, columns=cab_f), hide_index=True, width="stretch")
+                fig = graficos.interaccion_grid(resultado)
+                if fig:
+                    pest[-1].image(fig, width="stretch")
+                    pest[-1].caption("Cada línea es un técnico; el eje horizontal, el patrón. Líneas paralelas = no hay interacción.")
         with st.expander("Ver detalle técnico"):
             for x in xs:
                 _detalle_tecnico(x)
@@ -424,6 +447,9 @@ with t_res:
         for etapa, nombre in ETAPAS:
             st.markdown(f"### {nombre}")
             st.info(en_palabras(resultado["conclusiones"].get(etapa, "")), icon=":material/smart_toy:")
+            if QUE_SE_COMPARA.get(etapa):
+                with st.expander("Qué se compara en esta etapa"):
+                    tabla(pd.DataFrame(QUE_SE_COMPARA[etapa], columns=["Elemento", "Qué se compara", "Con qué"]))
             for tecnica, xs in _agrupar([x for x in resultado["resultados"] if x["etapa"] == etapa]):
                 _bloque_prueba(tecnica, xs, figs)
             if etapa == "limpieza":
@@ -455,6 +481,8 @@ with t_concl:
             st.write(resultado["conclusiones"]["conclusion_final"])
         tabla(pd.DataFrame([{"Característica": f["caracteristica"], "Configuración": f["estado_configurado"], "Ejecución": f["ejecucion"],
                              "Decisión": f["decision"], "Referencia": f["referencia"]} for f in resultado["caracteristicas"]]))
+        with st.expander("Qué significa cada parámetro (significado metrológico)"):
+            tabla(pd.DataFrame(SIGNIFICADO, columns=["Parámetro", "Qué es", "Qué significa para el método", "Referencia"]))
         _comentarios("conclusiones")
 
 # ------------------------------------------------------------------ 4 · rediseño

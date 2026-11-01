@@ -29,6 +29,8 @@ from src.motor import graficos
 from src.motor.lenguaje import DECISION, GLOBAL, en_palabras, explicar, hallazgos, que_hace
 from src.motor.plantillas import fmt, fmt_p
 from src.motor.referencias import CITAS, FUNDAMENTOS, REFERENCIAS
+from src.motor.tablas_contexto import QUE_SE_COMPARA, SIGNIFICADO, cruce, medias_por_factor, resumen_fuentes
+
 
 # ------------------------------------------------------------------ tipografía y color
 _FUENTES = Path(matplotlib.get_data_path()) / "fonts" / "ttf"
@@ -280,7 +282,7 @@ def _lienzo_numerado():
 FUND = [("Faltantes", ["faltantes"]), ("Mandel", ["mandel"]), ("Cochran", ["cochran"]), ("Grubbs", ["grubbs"]),
         ("Shapiro", ["shapiro_wilk"]), ("Anderson", ["anderson_darling"]), ("Lilliefors", ["lilliefors"]),
         ("Sesgo (t", ["sesgo_t"]), ("Sesgo (solo", ["sesgo_t"]), ("Sesgo (Wilcoxon", ["sesgo_wilcoxon"]),
-        ("Repetibilidad", ["repetibilidad"]), ("Precisión intermedia", ["precision_intermedia", "levene"]),
+        ("Repetibilidad", ["repetibilidad"]), ("Precisión intermedia", ["precision_intermedia", "levene"]), ("Fuentes de variación", ["fuentes_variacion"]),
         ("Reproducibilidad", ["reproducibilidad"])]
 NOMBRE_ETAPA = {"limpieza": "Limpieza y estructura", "atipicos": "Datos raros (atípicos)", "normalidad": "Forma de los datos (normalidad)",
                 "desempeno": "Desempeño del método"}
@@ -425,15 +427,9 @@ def generar_informe(resultado: dict, config: dict, estudio: Estudio, comentarios
     for fig in (graficos.resumen_sesgo(resultado, limite), graficos.resumen_precision(resultado)):
         if fig:
             h += [imagen(fig, 16.5), Spacer(1, 4)]
-    h.append(P("Cómo leer los resultados", "h3"))
-    h.append(tabla([["Término", "Qué significa"],
-                    ["Sesgo", "Cuánto se aleja, en promedio, la medición del valor correcto. Lo ideal es cerca de 0."],
-                    ["Repetibilidad (s_r)", "Cuánto cambian los resultados al repetir en las mismas condiciones. Menor es mejor."],
-                    ["Precisión intermedia (s_I)", "Cuánto cambian cuando cambian técnico, día o patrón dentro del laboratorio."],
-                    ["Intervalo de confianza 95 %", "Rango donde, con alta confianza, está el valor real."],
-                    ["Valor p", "Si es menor que 0,05, la diferencia observada difícilmente se debe al azar."],
-                    ["Sin criterio", "Se calculó el valor, pero el laboratorio no ha definido el límite para decir si cumple."]],
-                   [4.4 * cm, ANCHO - 4.4 * cm]))
+    h.append(P("Qué significa cada parámetro (significado metrológico)", "h3"))
+    h.append(tabla([["Parámetro", "Qué es", "Qué significa para el método", "Referencia"]] + [list(x) for x in SIGNIFICADO],
+                   [3.2 * cm, 4.6 * cm, 6.2 * cm, ANCHO - 14 * cm]))
     h += [CondPageBreak(7 * cm), P("Qué pruebas se aplicaron y cuáles no (y por qué)", "h3"), _pruebas_en_palabras(resultado)]
 
     # ---------- 2. limpieza
@@ -466,6 +462,10 @@ def generar_informe(resultado: dict, config: dict, estudio: Estudio, comentarios
         h += [CondPageBreak(6 * cm), P(f"4.{n}  {NOMBRE_ETAPA[etapa]}", "h2"),
               caja(en_palabras(resultado["conclusiones"].get(etapa, "")), "Conclusión preliminar (automática)")]
         rs = [x for x in resultado["resultados"] if x["etapa"] == etapa]
+        comp = QUE_SE_COMPARA.get(etapa)
+        if comp:
+            h += [P("Qué se compara en esta etapa", "h3"), tabla([["Elemento", "Qué se compara", "Con qué"]] + comp,
+                                                                  [3.6 * cm, 6.8 * cm, ANCHO - 10.4 * cm]), Spacer(1, 4)]
         if etapa == "desempeno":
             for car, titulo in (("sesgo", "Sesgo"), ("repetibilidad", "Repetibilidad"), ("precision_intermedia", "Precisión intermedia"),
                                 ("reproducibilidad", "Reproducibilidad")):
@@ -475,6 +475,22 @@ def generar_informe(resultado: dict, config: dict, estudio: Estudio, comentarios
                     ej = next((r for r in rs if r["caracteristica"] == car and r["estado"] == "APLICABLE"), None)
                     if ej:
                         h.append(P("Ejemplo en palabras: " + explicar(ej)["explicacion"], "nota"))
+            cab, filas_fv = resumen_fuentes(resultado)
+            if filas_fv:
+                h += [CondPageBreak(7 * cm), P("Fuentes de variación: ¿depende el resultado del técnico o del patrón?", "h3"),
+                      P(que_hace("Fuentes de variación") + " ✱ = influye significativamente (p < 0,05). El porcentaje es la parte de la "
+                        "variación total que explica cada fuente; el resto es repetibilidad (residual).", "nota"),
+                      tabla([cab] + filas_fv, [1.8 * cm] + [(ANCHO - 1.8 * cm - 3.6 * cm) / (len(cab) - 2)] * (len(cab) - 2) + [3.6 * cm])]
+                for nombre_f, (cab_f, filas_f) in medias_por_factor(resultado).items():
+                    h += [Spacer(1, 4), KeepTogether([P(f"{resultado['objeto']['nombre']} media por {nombre_f.lower()} en cada punto ({resultado['objeto']['unidad']})", "h3"),
+                          tabla([cab_f] + filas_f, [1.8 * cm] + [(ANCHO - 1.8 * cm) / (len(cab_f) - 1)] * (len(cab_f) - 1))])]
+                fig = graficos.interaccion_grid(resultado)
+                if fig:
+                    h += [Spacer(1, 4), P("Medias por combinación en cada punto (líneas paralelas = sin interacción)", "h3"), imagen(fig, 16.5)]
+                ej = cruce(resultado)
+                if ej:
+                    h += [Spacer(1, 4), P(f"Ejemplo de tabla cruzada en {ej[0]} (media por combinación)", "h3"),
+                          tabla([ej[1]] + ej[2], [4 * cm] + [(ANCHO - 4 * cm) / (len(ej[1]) - 1)] * (len(ej[1]) - 1))]
             lims = sorted({l for r in rs for l in r.get("limitaciones", [])})
             if lims:
                 h += [P("Advertencias técnicas", "h3")] + [P("•  " + l, "pl") for l in lims[:12]]

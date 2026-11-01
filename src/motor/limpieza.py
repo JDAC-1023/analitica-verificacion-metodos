@@ -68,6 +68,22 @@ def ejecutar(ctx: Contexto, tablas: dict) -> None:
               texto=f"Se esperaban {esperadas} resultados de «{obs.nombre_objeto}» según el plan; hay {len(obs.df)} válidos, "
                     f"{len(obs.excluidas)} excluidos con motivo y {faltantes} faltantes ({P.fmt(pct, 3)} %). "
                     "Los faltantes no se imputan; cada técnica verifica su propia suficiencia.")
+    # réplicas por serie frente al plan (cada serie debe tener exactamente las lecturas planificadas)
+    dif = t[t["observadas"] != t["esperadas"]]
+    nombre_p = {pid: d["punto"] for pid, d in ctx.est["niveles"].items()}
+    filas_s = [{"punto": nombre_p.get(f["punto_id"], f["punto_id"]), "serie": f["celda"], "planificadas": int(f["esperadas"]),
+                "válidas": int(f["observadas"]), "excluidas": int(f["excluidas"]),
+                "estado": "incompleta" if f["observadas"] < f["esperadas"] else "con lecturas de más"} for _, f in dif.iterrows()]
+    ctx.decidir("¿Cada serie tiene exactamente las lecturas planificadas?", "SI" if not filas_s else "NO",
+                f"{len(t)} series revisadas; {len(filas_s)} difieren del plan.", "RM-02")
+    ctx.nuevo(ETAPA, "Réplicas por serie frente al plan", "por serie (punto × condiciones)", APLICABLE, n=int(len(t)),
+              origen_regla=COMPLEMENTARIA, referencia="ISO 5725-2:1994 §7.2.8 (n_ij); plan aprobado del estudio",
+              estimacion={"nombre": "series_distintas_al_plan", "valor": len(filas_s), "unidad": "series", "series": int(len(t))},
+              tabla=filas_s, decision_inferencial="No aplica.",
+              limitaciones=[f"{len(filas_s)} serie(s) no tienen el número planificado de lecturas; se analizan con las que hay."] if filas_s else [],
+              texto=(f"Se revisaron {len(t)} series. " + (f"{len(filas_s)} no tienen el número planificado de lecturas: "
+                     + "; ".join(f"{f['punto']} · {f['serie']}: {f['válidas']} de {f['planificadas']}" for f in filas_s[:6]) + "."
+                     if filas_s else "Todas tienen exactamente las lecturas planificadas.")))
     # estructura
     filas = [{"nivel": d["punto"], "p_j": d["p_j"], "n_ij": ", ".join(f"{k}: {v}" for k, v in d["n_ij"].items()),
               "N_j": d["N_j"], "balanceado": "sí" if d["balanceado"] else "no", "gl_dentro": d["gl_dentro"]}

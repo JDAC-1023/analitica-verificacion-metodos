@@ -1,0 +1,207 @@
+{
+  "diseno": "8 temperaturas × 3 técnicos × 2 patrones × 5 lecturas",
+  "criterios": {
+    "sesgo": {
+      "parametro": "abs_sesgo",
+      "limite": 0.1,
+      "unidad": "°C",
+      "fuente": "Criterio de prueba del prototipo (datos sintéticos; no es un requisito del laboratorio)"
+    },
+    "repetibilidad": {
+      "parametro": "s_r",
+      "limite": 0.05,
+      "unidad": "°C",
+      "fuente": "Criterio de prueba del prototipo (datos sintéticos; no es un requisito del laboratorio)"
+    },
+    "precision_intermedia": {
+      "parametro": "s_I",
+      "limite": 0.08,
+      "unidad": "°C",
+      "fuente": "Criterio de prueba del prototipo (datos sintéticos; no es un requisito del laboratorio)"
+    }
+  },
+  "escenarios": {
+    "01_Normal_No_Cumple": {
+      "errores": [
+        {
+          "id": "E1",
+          "medicion": "M0007",
+          "que": "Lectura del IBC escrita como texto con coma decimal",
+          "espera": "TR02 la normaliza"
+        },
+        {
+          "id": "E2",
+          "medicion": "M0044",
+          "que": "Técnico escrito con espacios y minúscula",
+          "espera": "TR03 + TR04 lo normalizan"
+        },
+        {
+          "id": "E3",
+          "medicion": "M0093",
+          "que": "Lectura del IBC vacía (obligatoria)",
+          "espera": "RC15: queda pendiente; la serie queda con 4 lecturas"
+        },
+        {
+          "id": "E4",
+          "medicion": "M0120",
+          "que": "Hora real no válida «25:99»",
+          "espera": "RC19: solo avisa"
+        },
+        {
+          "id": "E5",
+          "medicion": "M0063",
+          "que": "Lectura anómala (+0,25 °C) en la serie −20 °C · T-01 · P-01",
+          "espera": "Grubbs la señala; no se borra automáticamente"
+        }
+      ],
+      "normal": true,
+      "sesgo": 0.25,
+      "s": 0.025,
+      "tec": [
+        -0.03,
+        0.0,
+        0.04
+      ],
+      "pat": [
+        0.004,
+        -0.004
+      ],
+      "anomalo": true
+    },
+    "02_Normal_Cumple": {
+      "errores": [
+        {
+          "id": "E1",
+          "medicion": "M0007",
+          "que": "Lectura del IBC escrita como texto con coma decimal",
+          "espera": "TR02 la normaliza"
+        },
+        {
+          "id": "E2",
+          "medicion": "M0044",
+          "que": "Técnico escrito con espacios y minúscula",
+          "espera": "TR03 + TR04 lo normalizan"
+        },
+        {
+          "id": "E3",
+          "medicion": "M0093",
+          "que": "Lectura del IBC vacía (obligatoria)",
+          "espera": "RC15: queda pendiente; la serie queda con 4 lecturas"
+        },
+        {
+          "id": "E4",
+          "medicion": "M0120",
+          "que": "Hora real no válida «25:99»",
+          "espera": "RC19: solo avisa"
+        }
+      ],
+      "normal": true,
+      "sesgo": 0.02,
+      "s": 0.02,
+      "tec": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "pat": [
+        0.0,
+        0.0
+      ],
+      "anomalo": false
+    },
+    "03_No_Normal_No_Cumple": {
+      "errores": [
+        {
+          "id": "E1",
+          "medicion": "M0007",
+          "que": "Lectura del IBC escrita como texto con coma decimal",
+          "espera": "TR02 la normaliza"
+        },
+        {
+          "id": "E2",
+          "medicion": "M0044",
+          "que": "Técnico escrito con espacios y minúscula",
+          "espera": "TR03 + TR04 lo normalizan"
+        },
+        {
+          "id": "E3",
+          "medicion": "M0093",
+          "que": "Lectura del IBC vacía (obligatoria)",
+          "espera": "RC15: queda pendiente; la serie queda con 4 lecturas"
+        },
+        {
+          "id": "E4",
+          "medicion": "M0120",
+          "que": "Hora real no válida «25:99»",
+          "espera": "RC19: solo avisa"
+        },
+        {
+          "id": "E5",
+          "medicion": "M0063",
+          "que": "Lectura anómala (+0,70 °C) en la serie −20 °C · T-01 · P-01",
+          "espera": "Grubbs la señala; no se borra automáticamente"
+        }
+      ],
+      "normal": false,
+      "sesgo": 0.15,
+      "s": 0.07,
+      "tec": [
+        -0.02,
+        0.0,
+        0.02
+      ],
+      "pat": [
+        0.01,
+        -0.01
+      ],
+      "anomalo": true
+    },
+    "04_No_Normal_Cumple": {
+      "errores": [
+        {
+          "id": "E1",
+          "medicion": "M0007",
+          "que": "Lectura del IBC escrita como texto con coma decimal",
+          "espera": "TR02 la normaliza"
+        },
+        {
+          "id": "E2",
+          "medicion": "M0044",
+          "que": "Técnico escrito con espacios y minúscula",
+          "espera": "TR03 + TR04 lo normalizan"
+        },
+        {
+          "id": "E3",
+          "medicion": "M0093",
+          "que": "Lectura del IBC vacía (obligatoria)",
+          "espera": "RC15: queda pendiente; la serie queda con 4 lecturas"
+        },
+        {
+          "id": "E4",
+          "medicion": "M0120",
+          "que": "Hora real no válida «25:99»",
+          "espera": "RC19: solo avisa"
+        },
+        {
+          "id": "E5",
+          "medicion": "M0063",
+          "que": "Lectura anómala (+0,20 °C) en la serie −20 °C · T-01 · P-01",
+          "espera": "Grubbs la señala; no se borra automáticamente"
+        }
+      ],
+      "normal": false,
+      "sesgo": 0.02,
+      "s": 0.02,
+      "tec": [
+        -0.004,
+        0.0,
+        0.004
+      ],
+      "pat": [
+        0.002,
+        -0.002
+      ],
+      "anomalo": true
+    }
+  }
+}

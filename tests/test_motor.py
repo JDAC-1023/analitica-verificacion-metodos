@@ -178,7 +178,7 @@ def test_sin_criterio_calculado_sin_evaluacion():
     """Entrada: datos normales sin criterios. Esperado: todas las estimaciones CALCULADO_SIN_EVALUACION; sin conformidad global."""
     e, t = estudio_intra(_normales(0.0, 0.05, 2))
     r = ejecutar(t, e, cfg_intra(e, []))
-    des = [x for x in r["resultados"] if x["etapa"] == "desempeno" and x["estado"] == APLICABLE]
+    des = [x for x in r["resultados"] if x["etapa"] == "desempeno" and x["estado"] == APLICABLE and x["caracteristica"] != "fuentes_variacion"]
     assert des and all(x["decision_metrologica"] == SIN_EVALUACION for x in des)
     assert r["conclusion_final"]["estado"] == SIN_EVALUACION
 
@@ -341,3 +341,30 @@ def test_texto_nunca_confirma_normalidad(iso):
     """Entrada: todos los textos generados. Esperado: no aparece «se confirma»."""
     textos = " ".join(x["texto"] for x in iso["resultados"]) + " ".join(iso["conclusiones"].values())
     assert "se confirma" not in textos.lower()
+
+
+def test_fuentes_de_variacion_detecta_tecnico():
+    """Entrada: 2 técnicos × 2 días × 3 réplicas; el técnico T-02 mide 0,3 °C más. Esperado: el ANOVA factorial marca «Técnico» como
+    fuente que influye (p < 0,05) con la mayor contribución, no marca «Día», incluye la interacción y entrega medias por técnico."""
+    base = [0.10, 0.11, 0.09]
+    valores = {"PT-01": base * 2 + [x + 0.3 for x in base] * 2}   # orden: técnico × día × réplica
+    e, t = estudio_intra(valores)
+    r = ejecutar(t, e, cfg_intra(e, []))
+    fv = _r(r, "Fuentes de variación")[0]
+    assert fv["estado"] == APLICABLE and fv["estimacion"]["influyen"] == ["Técnico"]
+    filas = {f["fuente"]: f for f in fv["estimacion"]["anova"]}
+    assert set(filas) == {"Técnico", "Día", "Técnico × Día", "Residual (repetibilidad)"}
+    assert filas["Técnico"]["contribucion_pct"] > 90
+    medias = {x["nivel"]: x["media"] for x in fv["estimacion"]["contexto"]["por_factor"]["Técnico"]}
+    assert medias["T-02"] - medias["T-01"] == pytest.approx(0.3)
+    assert fv["decision_metrologica"] == ""          # es inferencial: no se evalúa contra un criterio
+
+
+def test_conforme_con_observaciones_si_no_normal():
+    """Entrada: datos asimétricos que cumplen los límites. Esperado: «CONFORME_CON_OBSERVACIONES» con la observación de normalidad."""
+    e, t, kw = _no_normales({})
+    crit = [CriterioMotor("CM-01", "sesgo", "abs_sesgo", "<=", 0.5, "°C", "estimacion", "PI-01", True),
+            CriterioMotor("CM-02", "repetibilidad", "s_r", "<=", 1.0, "°C", "estimacion", "PI-01", True)]
+    r = ejecutar(t, e, cfg_intra(e, crit, **kw))
+    assert r["conclusion_final"]["estado"] == "CONFORME_CON_OBSERVACIONES"
+    assert any("normalidad" in a for a in r["conclusion_final"]["avisos"])

@@ -81,9 +81,9 @@ def requerir_estudio() -> Estudio:
     e = estudio_actual()
     if e is None:
         with st.container(border=True):
-            st.markdown("#### :material/folder_open: Aún no has elegido un estudio")
-            st.write("Pulsa **Crear estudio** en la barra lateral o selecciona uno existente para continuar.")
-            st.page_link(PAGINAS["asistente"], label="Crear o continuar un estudio", icon=":material/arrow_forward:")
+            st.markdown("#### :material/folder_open: Aún no has abierto un estudio")
+            st.write("Ve a **Inicio** y pulsa **Abrir** en el estudio que quieres revisar, o crea uno nuevo.")
+            st.page_link(PAGINAS["inicio"], label="Elegir un estudio en Inicio", icon=":material/arrow_forward:")
         st.stop()
     return e
 

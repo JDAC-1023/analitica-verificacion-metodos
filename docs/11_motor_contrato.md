@@ -16,7 +16,7 @@ La matriz describe el diseño y la ingesta, pero no trae lo necesario para decid
 | `factores_precision_intermedia[]` | Forman las celdas (condiciones que cambian dentro del laboratorio) | Una sola celda por nivel; s_r con supuesto declarado |
 | `referencia_tipo`, `referencias[]` (valor, u estándar, fuente por punto) | Sesgo | Sesgo NO_APLICABLE o DATOS_INSUFICIENTES |
 | `criterios[]` (característica, parámetro, operador, límite, unidad, regla de decisión, fuente, aprobado, puntos) | Decisión metrológica. La matriz (C03) guarda el criterio como texto libre | `CALCULADO_SIN_EVALUACION` |
-| `alfa`, `nivel_confianza`, `prueba_normalidad` | Parámetros explícitos | Valores visibles en la configuración (0,05 / 0,95 / Shapiro-Wilk), editables |
+| `alfa`, `nivel_confianza`, `prueba_normalidad` | **Fijos** (0,05 / 95 % / Shapiro-Wilk, RM-24): la decisión de las pruebas de hipótesis no es configurable | — |
 | `alerta_faltantes_pct` | Aviso opcional; **no** es criterio de aplicabilidad | Sin alerta |
 | `version_normativa` | Si no es «ISO 5725-2:1994», no se usan las tablas implementadas | — |
 | `exclusiones[]` (medición, motivo, responsable, fecha) | Solo en versiones derivadas | — |
@@ -38,6 +38,8 @@ La matriz describe el diseño y la ingesta, pero no trae lo necesario para decid
 | Desempeño | Repetibilidad s_r (ec. 20) con IC χ² | Al menos una celda con réplicas | Norma |
 | Desempeño | Precisión intermedia s_I (ANOVA un factor, Satterthwaite) | ≥ 2 grupos, alguno con réplicas | Complementaria (Eurachem §6.6.4) |
 | Desempeño | Reproducibilidad s_R (ec. 19–24) | Solo interlaboratorio | Norma |
+| Desempeño | Fuentes de variación: ANOVA factorial (técnico, patrón, interacción; tipo II) | Intralaboratorio con factores declarados y réplicas | Complementaria (RM-23) |
+| Limpieza | Réplicas por serie frente al plan | Siempre | Complementaria |
 | Criterios | Estimación o intervalo frente al límite | Criterio aprobado completo | Criterio del laboratorio |
 
 ## 3. Tres decisiones separadas

@@ -94,6 +94,8 @@ def ejecutar(ctx: Contexto) -> None:
         _repetibilidad(ctx)
     if "precision_intermedia" in activas:
         _precision_intermedia(ctx)
+        from src.motor import fuentes
+        fuentes.ejecutar(ctx)
     if "reproducibilidad" in activas:
         _reproducibilidad(ctx)
 

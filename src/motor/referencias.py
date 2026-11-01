@@ -122,6 +122,16 @@ FUNDAMENTOS = {
                   "si s_L² resulta negativo se toma como cero (§7.4.5.4)."),
         "refs": ["iso5725_2"],
     },
+    "fuentes_variacion": {
+        "titulo": "Fuentes de variación: ANOVA factorial (técnico × patrón)",
+        "texto": ("Para saber si el resultado depende de quién mide, de con qué patrón se mide o de la combinación de ambos, se ajusta en "
+                  "cada punto un modelo de análisis de varianza de efectos fijos con los factores declarados y su interacción "
+                  "(y = μ + αᵢ + βⱼ + (αβ)ᵢⱼ + ε). Cada estadístico F compara la variación atribuible a la fuente con la variación entre réplicas; "
+                  "un valor p < α indica que la fuente cambia el resultado medio. La interacción solo es estimable si hay réplicas en cada "
+                  "combinación. La contribución porcentual (SC de la fuente / SC total) muestra cuánta de la variación total explica cada fuente. "
+                  "Supone residuos normales e independientes y varianzas similares entre combinaciones."),
+        "refs": ["montgomery", "eurachem", "statsmodels"],
+    },
     "levene": {
         "titulo": "Homogeneidad de varianzas (Levene, centrado en la mediana)",
         "texto": ("Diagnóstico del supuesto de varianzas homogéneas del ANOVA, robusto frente a desviaciones de la normalidad "

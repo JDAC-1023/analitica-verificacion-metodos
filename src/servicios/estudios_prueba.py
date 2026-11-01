@@ -150,15 +150,16 @@ def crear_estudio_desde_archivo(repo: Repositorio, contenido: bytes, nombre_arch
     base = repo.crear_estudio(nombre, usuario)
     e, df, columnas = leer_definicion(contenido, base.codigo, nombre)
     e.creado_en = base.creado_en
-    e.uso_previsto = (f"Testeo del motor — escenario: {escenario}. " if escenario else "") + \
-        f"Datos sintéticos importados desde «{nombre_archivo}»; no válidos como resultados de calibración."
+    e.uso_previsto = (f"Escenario: {escenario}. " if escenario else "") + \
+        f"Datos sintéticos importados desde «{nombre_archivo}»; no válidos como resultados de calibración. {ETIQUETA}"
     repo.guardar_estudio(e, usuario, f"Importado desde {nombre_archivo}")
     repo.aprobar_version(e, usuario)
     lleno = diligenciar_plantilla(generar_plantilla(e), valores_del_archivo(df, columnas))
     carga = cargar_archivo(repo, e.codigo, lleno, nombre_archivo, usuario)
     if carga["estado_archivo"] != "leido":
         raise ErrorImportacion(f"La carga de {nombre_archivo} fue rechazada.")
-    prep = preparar_conjunto(repo, e.codigo, carga["carga_id"], ["TR01"], [], usuario)
+    # Igual que un usuario: autoriza las transformaciones que solo cambian la forma de escribir (TR01–TR04).
+    prep = preparar_conjunto(repo, e.codigo, carga["carga_id"], ["TR01", "TR02", "TR03", "TR04"], [], usuario)
     aprobar_conjunto(repo, e.codigo, prep["preparacion_id"], usuario)
     salida = {"codigo": e.codigo, "nombre": nombre, "mediciones": len(e.plan), "conteos": prep["conteos"], "analisis": None}
 
@@ -171,13 +172,29 @@ def crear_estudio_desde_archivo(repo: Repositorio, contenido: bytes, nombre_arch
         cfg.referencia_tipo = "objeto_es_diferencia"
         cfg.caracteristicas = [CaracteristicaConfig("sesgo", "REQUERIDA"), CaracteristicaConfig("repetibilidad", "REQUERIDA"),
                                CaracteristicaConfig("precision_intermedia", "REQUERIDA")]
-        cfg.motivo_cambio = "Configuración inicial automática sin criterios (los define el laboratorio)."
+        cfg.criterios = criterios_de_prueba()
+        cfg.motivo_cambio = ("Configuración inicial con los criterios de prueba de las bases sintéticas." if cfg.criterios
+                             else "Configuración inicial sin criterios (los define el laboratorio).")
         if ejecutar:
             r = ejecutar_analisis(repo, cfg, usuario)
             salida["analisis"] = r["conclusion_final"]["estado"]
         else:
             repo.guardar_config_analisis(e.codigo, cfg.to_dict())
     return salida
+
+
+ETIQUETA = "[bases v2]"
+
+
+def criterios_de_prueba() -> list:
+    """Criterios del archivo criterios_prueba.json (solo para las bases sintéticas)."""
+    from src.motor.configuracion import CriterioMotor
+    ruta = CARPETA_PRUEBAS / "criterios_prueba.json"
+    if not ruta.exists():
+        return []
+    datos = json.loads(ruta.read_text(encoding="utf-8")).get("criterios", {})
+    return [CriterioMotor(f"CP-{i:02d}", car, c["parametro"], "<=", float(c["limite"]), c["unidad"], "estimacion", c["fuente"], True)
+            for i, (car, c) in enumerate(datos.items(), start=1)]
 
 
 ESCENARIOS = {
@@ -202,14 +219,19 @@ def crear_estudios_prueba(repo: Repositorio, usuario: str, carpeta: Path | None 
     archivos = sorted(carpeta.glob("*.xlsx"))
     if not archivos:
         raise ErrorImportacion(f"No hay archivos .xlsx en {carpeta}.")
-    existentes = {x["nombre"] for x in repo.listar_estudios()}
+    existentes = {x["nombre"]: x["codigo"] for x in repo.listar_estudios()}
     salida = []
     for a in archivos:
         n, desc = escenario(a.name)
         nombre = f"Testeo {n}"
         if nombre in existentes:
-            salida.append({"nombre": nombre, "omitido": "ya existe"})
-            continue
+            viejo = repo.obtener_estudio(existentes[nombre])
+            if ETIQUETA in (viejo.uso_previsto or ""):
+                salida.append({"nombre": nombre, "omitido": "ya existe"})
+                continue
+            # Testeo de una versión anterior de las bases: se conserva, renombrado (no se borra nada).
+            viejo.nombre = f"{nombre} (bases anteriores)"
+            repo.guardar_estudio(viejo, usuario, "Renombrado al cargar las bases de prueba nuevas")
         r = crear_estudio_desde_archivo(repo, a.read_bytes(), a.name, nombre, usuario, escenario=desc)
         salida.append(r)
     return salida

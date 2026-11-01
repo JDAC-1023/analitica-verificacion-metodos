@@ -50,7 +50,7 @@ def evaluar_valor(valor: float, ic, c: CriterioMotor, parametro: str) -> tuple[s
 
 def ejecutar(ctx: Contexto) -> None:
     for r in ctx.resultados:
-        if r.etapa != "desempeno" or r.estado != APLICABLE or not r.estimacion:
+        if r.etapa != "desempeno" or r.estado != APLICABLE or not r.estimacion or r.caracteristica == "fuentes_variacion":
             continue
         candidatos = buscar(ctx, r.caracteristica, r.punto_id)
         estado, motivo, req = SIN_EVALUACION, "No hay un criterio definido para esta característica y nivel.", {}

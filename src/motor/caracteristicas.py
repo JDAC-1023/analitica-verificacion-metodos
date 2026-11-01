@@ -87,7 +87,7 @@ def conclusion_global(ctx: Contexto, filas: list[dict], info_ruta: dict) -> dict
     elif any(f["decision"] == NO_CONFORME for f in base):
         nc = ", ".join(f["caracteristica"] for f in base if f["decision"] == NO_CONFORME)
         estado, texto = NO_CONFORME, f"El método NO CUMPLE en: {nc}."
-    elif all(f["decision"] == CONFORME for f in base) and not info_ruta["avisos"]:
+    elif all(f["decision"] == CONFORME for f in base):
         estado = CONFORME
         texto = (f"Todas las características {'requeridas' if requeridas else 'seleccionadas'} cumplen sus criterios aprobados "
                  f"en todos los niveles evaluados.")
@@ -100,7 +100,14 @@ def conclusion_global(ctx: Contexto, filas: list[dict], info_ruta: dict) -> dict
     else:
         estado = SIN_EVALUACION
         texto = "Los resultados se calcularon, pero no todos tienen un criterio aprobado: no se emite conformidad."
-    if info_ruta["avisos"] and estado == CONFORME:
+    avisos = list(info_ruta["avisos"])
+    no_normal = [r.agrupacion for r in ctx.resultados if r.etapa == "normalidad" and r.decision_inferencial == "Se rechaza H0"]
+    if no_normal:
+        avisos.append(f"Se rechazó la normalidad en {len(no_normal)} revisión(es) ({'; '.join(no_normal[:3])}"
+                      f"{'…' if len(no_normal) > 3 else ''}); allí se usaron métodos no paramétricos o se declara como limitación (RM-25).")
+    if avisos and estado == CONFORME:
         estado = "CONFORME_CON_OBSERVACIONES"
+        texto = texto.rstrip(".") + ", con observaciones."
+    info_ruta = {**info_ruta, "avisos": avisos}
     return {"tipo": tipo, "estado": estado, "texto": f"{tipo or 'Estudio'}: {texto}", "avisos": info_ruta["avisos"],
             "marco": "ISO 5725-1/-2:1994 (precisión y veracidad) y Eurachem (2016) (adecuación al uso)"}

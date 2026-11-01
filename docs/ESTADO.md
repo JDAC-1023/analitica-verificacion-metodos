@@ -1,6 +1,6 @@
 # Estado del desarrollo
 
-Comprobado el 2026-11-01 con 120 pruebas automatizadas (todas aprobadas), pruebas de humo de cada página, instalación limpia en un entorno nuevo y recorrido real en navegador (incluidos el análisis y la emisión del PDF).
+Comprobado el 2026-11-01 con 123 pruebas automatizadas (todas aprobadas), pruebas de humo de cada página, instalación limpia en un entorno nuevo y recorrido real en navegador (incluidos el análisis y la emisión del PDF).
 
 ## Terminado y comprobado
 
@@ -20,12 +20,14 @@ Comprobado el 2026-11-01 con 120 pruebas automatizadas (todas aprobadas), prueba
 | 4 · Ingesta | Conservación del original y su SHA-256. Identificación de estudio, versión y huella. Columnas por encabezado (tolera reordenar filas). Historial de cargas con diferencias | test_ingesta |
 | 5 · Calidad | 20 reglas, estados por registro, conteos conciliados, mensajes con hoja, fila y celda, 4 transformaciones autorizables, exclusiones con motivo, informe de incidencias en Excel | test_calidad, test_preparacion |
 | 6 · Exportación | ZIP SAL-1.0 con tablas normalizadas, manifiesto con huellas, salida reproducible byte a byte, lector Python que verifica integridad, aprobación del conjunto (X07) | test_preparacion, ejemplos/ |
-| 7 · Pruebas | 120 pruebas, también en GitHub Actions | `07_pruebas.md` |
+| 7 · Pruebas | 123 pruebas, también en GitHub Actions | `07_pruebas.md` |
 | 9 · Motor | Etapas, reglas, tablas ISO verificadas contra fórmula, anexo B.1, 4 escenarios y casos adversos | test_motor |
 | 10 · Informe | Versionado, comentarios, clonación, PDF leído en la prueba | test_analisis_servicio, test_interfaz |
 | 8 · Documentación | Insumos técnicos en `docs/` (4 generados desde el código) | — |
 
 **Testeos, limpieza y lenguaje sencillo (3.2):** Testeo 1–4 se crean solos al abrir la app desde `data/estudios_prueba/` (una vez por carpeta de datos). Reporte de limpieza en pantalla y en PDF: pasos, 20 reglas con sus hallazgos, transformaciones autorizadas y aplicadas, exclusiones, lo que nunca se hace y herramientas. Cada prueba explica en palabras sencillas qué hace y por qué se aplicó o no (`src/motor/lenguaje.py`). Informe PDF con portada, resumen para todos, gráficos de resumen y tablas con color.
+
+**Versión 4.0:** selección de estudios con tarjetas en Inicio y panel integrado; bases de prueba con 5 lecturas por serie y errores sembrados (240 mediciones, 4 escenarios con su resultado esperado comprobado en `test_crear_estudios_de_prueba`); ANOVA factorial de fuentes de variación (técnico, patrón, interacción) con contribución porcentual, medias por factor y gráfico de combinaciones; revisión de réplicas por serie frente al plan; parámetros de las pruebas de hipótesis fijos (RM-24) y solo límites de aceptación configurables; «cumple con observaciones» cuando se rechaza la normalidad (RM-25); informe con tabla de significado metrológico y «qué se compara» en cada etapa.
 
 ## Funciona con limitaciones conocidas
 

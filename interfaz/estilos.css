@@ -38,3 +38,14 @@
 
 .avm-leyenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: .82rem; color: #5B5880; }
 .avm-muestra { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+/* Tarjetas de estudio (Inicio) */
+.avm-tarjeta-codigo { font-size: .74rem; letter-spacing: .06em; text-transform: uppercase; color: #6D5BD0; font-weight: 600; }
+.avm-tarjeta-nombre { font-size: 1.08rem; font-weight: 700; color: #1E1B4B; margin: 4px 0 2px 0; line-height: 1.25; }
+.avm-tarjeta-sub { font-size: .84rem; color: #5B5880; margin-bottom: 8px; }
+.avm-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.avm-chip { font-size: .74rem; padding: 3px 9px; border-radius: 999px; border: 1px solid #E2DFF2; background: #FFFFFF; color: #5B5880; }
+.avm-chip-verde { background: #E7F7F1; border-color: #BFE9DA; color: #0E7A5D; }
+.avm-chip-rojo { background: #FDECEC; border-color: #F5C2C2; color: #A61B1B; }
+.avm-chip-naranja { background: #FFF4E0; border-color: #F6D9A6; color: #8A5A00; }
+.avm-chip-gris { background: #F3F2F7; border-color: #E2DFF2; color: #5B5880; }

@@ -121,7 +121,7 @@ def conclusiones_por_etapa(ctx: Contexto, final: dict) -> dict:
     # desempeño
     partes, grupos = [], {}
     for x in res:
-        if x.etapa != "desempeno" or x.estado != APLICABLE or not x.estimacion:
+        if x.etapa != "desempeno" or x.estado != APLICABLE or not x.estimacion or x.caracteristica == "fuentes_variacion":
             continue
         grupos.setdefault((x.caracteristica, x.estimacion["nombre"]), []).append(x)
     for (_, nombre), xs in grupos.items():
@@ -137,6 +137,14 @@ def conclusiones_por_etapa(ctx: Contexto, final: dict) -> dict:
         metodos = ", ".join(r.split("(")[-1].rstrip(")") for r in rutas)
         partes.append(f"{car} ({nombre}; método: {metodos}) en {len(xs)} punto(s): {rango} {unidad} → "
                       + ", ".join(f"{k}: {v}" for k, v in decs.items()))
+    fv = [x for x in res if x.caracteristica == "fuentes_variacion" and x.estado == APLICABLE]
+    if fv:
+        cuenta = {}
+        for x in fv:
+            for f in x.estimacion["influyen"]:
+                cuenta[f] = cuenta.get(f, 0) + 1
+        partes.append("Fuentes de variación (ANOVA): " + ("; ".join(f"{k} influye en {v} de {len(fv)} punto(s)" for k, v in cuenta.items())
+                                                          if cuenta else f"ninguna fuente significativa en los {len(fv)} punto(s)"))
     no_ap = [f"{x.tecnica}: {x.motivos[0].rstrip('.')}" for x in res if x.etapa == "desempeno" and x.estado in (NO_APLICABLE, DATOS_INSUFICIENTES) and x.motivos]
     out["desempeno"] = ("; ".join(partes) + ". " if partes else "No hay estimaciones de desempeño. ") + \
         (("No calculado: " + "; ".join(no_ap) + ".") if no_ap else "")

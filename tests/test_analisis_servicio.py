@@ -84,14 +84,26 @@ def test_clonar_estudio(repo, estudio_aprobado):
 
 
 def test_crear_estudios_de_prueba(repo):
-    """Entrada: las 4 plantillas diligenciadas de data/estudios_prueba. Esperado: 4 estudios aprobados, 288 mediciones
-    aceptadas cada uno, conjunto aprobado y análisis v1 de la corrección ejecutado sin criterios; volver a pulsar no duplica."""
+    """Entrada: las 4 bases sintéticas de data/estudios_prueba (8 temperaturas × 3 técnicos × 2 patrones × 5 lecturas, con errores
+    sembrados). Esperado: Testeo 1–4 creados con el mismo flujo que un usuario; la limpieza normaliza 2 registros (TR02, TR03+TR04),
+    deja 1 pendiente (dato vacío) y 1 con advertencia (hora); el motor da NO CUMPLE / CUMPLE / NO CUMPLE / CUMPLE CON OBSERVACIONES;
+    detecta la lectura anómala sembrada (M0063), la serie incompleta y la influencia del técnico en el Testeo 1; no duplica al repetir."""
     from src.servicios.estudios_prueba import crear_estudios_prueba
     creados = crear_estudios_prueba(repo, "ana")
-    assert len(creados) == 4 and [x["nombre"] for x in creados] == ["Testeo 1", "Testeo 2", "Testeo 3", "Testeo 4"]
-    assert "no cumple" in repo.obtener_estudio(creados[0]["codigo"]).uso_previsto
-    for x in creados:
-        assert x["mediciones"] == 288 and x["conteos"]["aceptados"] == 288 and x["analisis"] == "CALCULADO_SIN_EVALUACION"
+    assert [x["nombre"] for x in creados] == ["Testeo 1", "Testeo 2", "Testeo 3", "Testeo 4"]
+    esperado = ["NO_CONFORME", "CONFORME", "NO_CONFORME", "CONFORME_CON_OBSERVACIONES"]
+    for x, est in zip(creados, esperado):
+        c = x["conteos"]
+        assert x["mediciones"] == 240 and c["normalizados"] == 2 and c["pendientes"] == 1 and c["con_advertencia"] == 1
+        assert x["analisis"] == est, (x["nombre"], x["analisis"])
         r = repo.obtener_analisis(x["codigo"], 1)["resultado"]
-        assert r["objeto"]["nombre"] == "Corrección" and len(r["datos"]) == 288
+        assert r["objeto"]["nombre"] == "Corrección" and len(r["datos"]) == 239
+        series = next(y for y in r["resultados"] if y["tecnica"].startswith("Réplicas por serie"))
+        assert series["estimacion"]["valor"] == 1 and series["tabla"][0]["válidas"] == 4
+    r1 = repo.obtener_analisis(creados[0]["codigo"], 1)["resultado"]
+    marcadas = {t.get("medicion_id") for y in r1["resultados"] if y["etapa"] == "atipicos" for t in y["tabla"]
+                if t.get("clasificacion") in ("rezagado (*)", "atípico (**)")}
+    assert "M0063" in marcadas
+    fv = [y for y in r1["resultados"] if y["caracteristica"] == "fuentes_variacion" and y["estado"] == "APLICABLE"]
+    assert len(fv) == 8 and all("Técnico" in y["estimacion"]["influyen"] for y in fv)
     assert all("omitido" in x for x in crear_estudios_prueba(repo, "ana"))

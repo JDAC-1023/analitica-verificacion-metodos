@@ -32,6 +32,9 @@ REGLAS = {
     "RM-20": ("Decisión inferencial, estimación y decisión metrológica se informan por separado.", COMPLEMENTARIA, "Especificación §9"),
     "RM-21": ("Ruta verificación/validación según el estado del método: validado y sin modificaciones → verificación.", NORMA, "Eurachem (2016) §4.2; ISO/IEC 17025:2017 §7.2.1.5 y §7.2.2"),
     "RM-22": ("Dixon no se implementa: no se dispone de tablas críticas verificadas.", COMPLEMENTARIA, "Dixon (1950)"),
+    "RM-23": ("Fuentes de variación: ANOVA factorial por punto (técnico, patrón, …) con interacciones solo si hay réplicas en cada combinación; la influencia se decide por el valor p.", COMPLEMENTARIA, "Montgomery (2017) cap. 5"),
+    "RM-24": ("α = 0,05, confianza 95 % y Shapiro-Wilk son fijos: la decisión de las pruebas de hipótesis no es configurable; solo se configuran los límites de aceptación.", COMPLEMENTARIA, "Especificación del equipo (2026-11-01)"),
+    "RM-25": ("Si el método cumple pero se rechazó la normalidad en alguna revisión, la conclusión es «cumple con observaciones».", COMPLEMENTARIA, "Especificación del equipo (2026-11-01)"),
 }
 
 

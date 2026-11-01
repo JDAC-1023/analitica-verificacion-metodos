@@ -172,3 +172,19 @@ def test_pagina_analisis_ejecuta_desde_la_interfaz(entorno):
     assert not at.exception, [x.value for x in at.exception]
     v = RepositorioLocal().listar_analisis(entorno.codigo)
     assert v and v[0]["ejecutado"]
+
+
+def test_inicio_tarjetas_y_panel(entorno):
+    """Entrada: Inicio sin estudio abierto; se pulsa «Abrir» en la tarjeta del estudio. Esperado: el estudio queda abierto y
+    se muestra su panel (pestañas Resumen, Configuración, Datos, Resultados, Informes) sin selector lateral."""
+    at = AppTest.from_file(APP, default_timeout=30)
+    at.session_state["usuario"] = "ana"
+    at.run()
+    assert not at.exception
+    assert not any(s.label == "Estudio activo" for s in at.selectbox)
+    next(b for b in at.button if b.key == f"abrir_{entorno.codigo}").click()
+    at.run()
+    assert not at.exception, [x.value for x in at.exception]
+    assert at.session_state["estudio_codigo"] == entorno.codigo
+    assert [t.label for t in at.tabs][:5] == [":material/dashboard: Resumen", ":material/tune: Configuración", ":material/dataset: Datos",
+                                             ":material/query_stats: Resultados", ":material/description: Informes"]

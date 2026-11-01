@@ -18,6 +18,7 @@ ESTADO = {
 }
 DECISION = {
     "CONFORME": ("Cumple", "🟢", "green", "El resultado cumple el criterio de aceptación aprobado."),
+    "CONFORME_CON_OBSERVACIONES": ("Cumple con observaciones", "🟢", "green", "Cumple, con observaciones técnicas."),
     "NO_CONFORME": ("No cumple", "🔴", "red", "El resultado no cumple el criterio de aceptación aprobado."),
     "INDETERMINADO": ("No se puede decidir", "🟡", "orange",
                       "El margen de incertidumbre del resultado cruza el límite: con estos datos no se puede afirmar que cumpla ni que no cumpla."),
@@ -33,6 +34,7 @@ GLOBAL = {
 
 QUE_HACE = [
     ("Faltantes", "Cuenta cuántos resultados se esperaban según el plan y cuántos llegaron."),
+    ("Réplicas por serie", "Revisa que cada serie (punto + técnico + patrón) tenga exactamente las lecturas planificadas."),
     ("Estructura", "Revisa cómo quedaron agrupados los datos: puntos, grupos de condiciones y repeticiones por grupo."),
     ("Exclusiones", "Lista los datos que una persona decidió dejar por fuera, con su motivo."),
     ("Mandel h", "Compara el promedio de cada laboratorio con el de los demás para ver si alguno se aleja."),
@@ -45,6 +47,7 @@ QUE_HACE = [
     ("Shapiro", "Revisa si los datos tienen la forma de campana (distribución normal) que suponen varias pruebas."),
     ("Anderson", "Revisa si los datos tienen forma de campana, poniendo atención a los extremos."),
     ("Lilliefors", "Revisa si los datos tienen forma de campana."),
+    ("Fuentes de variación", "Compara técnicos, patrones (y su combinación) para ver si el resultado depende de quién mide o con qué patrón."),
     ("Sesgo", "Mide cuánto se desvía, en promedio, el resultado respecto al valor de referencia."),
     ("Repetibilidad", "Mide cuánto varían los resultados al repetir la medición en las mismas condiciones."),
     ("Precisión intermedia", "Mide cuánto varían los resultados cuando cambian condiciones del laboratorio (técnico, día, patrón)."),
@@ -99,6 +102,8 @@ def _resultado(r: dict) -> str:
     if tec.startswith("Faltantes"):
         return (f"Llegaron {r['n']} de {e.get('esperadas')} resultados esperados ({fmt(e.get('valor'), 3)} % faltantes). "
                 "No se inventó ni se rellenó ningún dato.")
+    if tec.startswith("Réplicas por serie"):
+        return r.get("texto", "")
     if tec.startswith("Estructura"):
         return f"Los datos se analizan en {e.get('valor')} punto(s) de medición."
     if tec.startswith("Exclusiones"):
@@ -128,6 +133,13 @@ def _resultado(r: dict) -> str:
         elif di.startswith("No se rechaza"):
             txt += "No se detecta una desviación distinta de cero (eso no prueba que no exista)."
         return txt
+    if tec.startswith("Fuentes de variación"):
+        filas = [f for f in e.get("anova", []) if f.get("tipo") != "residual"]
+        partes = []
+        for f in filas:
+            pct = f" (explica {fmt(f['contribucion_pct'], 2)} % de la variación)" if f.get("contribucion_pct") is not None else ""
+            partes.append(f"{f['fuente']}: {'SÍ influye' if f['influye'] else 'no se detecta influencia'}, p = {fmt_p(f['p'])}{pct}")
+        return "; ".join(partes) + "." if partes else r.get("texto", "")
     if tec.startswith("Repetibilidad"):
         return f"Al repetir en las mismas condiciones, los resultados varían típicamente ± {fmt(e.get('valor'))} {u} (desviación estándar)."
     if tec.startswith("Precisión intermedia"):
@@ -186,6 +198,14 @@ def hallazgos(resultado: dict) -> list[str]:
         salida.append("Forma de campana: " + (f"en {len(no)} de {n_norm} revisiones los datos no tienen forma de campana; "
                                                "allí se usaron métodos que no dependen de ella." if no else
                                                "no hay evidencia en contra en ninguna revisión."))
+    fv = [x for x in res if x.get("caracteristica") == "fuentes_variacion" and x["estado"] == "APLICABLE"]
+    if fv:
+        cuenta = {}
+        for x in fv:
+            for f in x["estimacion"].get("influyen", []):
+                cuenta[f] = cuenta.get(f, 0) + 1
+        salida.append("¿Depende de quién mide o del patrón? " + ("; ".join(f"{k}: influye en {v} de {len(fv)} punto(s)" for k, v in cuenta.items())
+                                                              if cuenta else f"no: ninguna fuente fue significativa en los {len(fv)} punto(s)") + ".")
     nombres = {"sesgo": "Sesgo (desvío promedio)", "repetibilidad": "Repetibilidad", "precision_intermedia": "Precisión intermedia",
                "reproducibilidad": "Reproducibilidad"}
     for car in ("sesgo", "repetibilidad", "precision_intermedia", "reproducibilidad"):
@@ -216,6 +236,9 @@ def corto(r: dict) -> str:
         if di.startswith("No se rechaza"):
             return "No se detecta desvío"
         return "Solo estimación"
+    if r["tecnica"].startswith("Fuentes de variación"):
+        inf = (r.get("estimacion") or {}).get("influyen") or []
+        return ("Influye: " + ", ".join(inf)) if inf else "Ninguna fuente influye"
     if r["tecnica"].startswith("Precisión intermedia"):
         return "El cambio de condiciones influye" if di.startswith("Se rechaza") else "No se detecta efecto de las condiciones"
     return ""

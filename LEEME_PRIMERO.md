@@ -1,6 +1,8 @@
 # Cómo incorporar esta entrega (Windows · PowerShell)
 
-> **Actualización 3.2:** al abrir la app se crean solos **Testeo 1–4** en la base de datos (con sus 288 mediciones cargadas, revisadas, aprobadas y analizadas). Nuevo **reporte de limpieza** (Datos preparados), explicaciones en lenguaje sencillo de por qué se aplica o no cada prueba, e informe PDF rediseñado.
+> **Actualización 4.0:** Inicio con tarjetas para abrir cada estudio y su panel (sin selector lateral) · Testeo 1–4 rehechos: 5 lecturas por serie, errores sembrados y criterio de prueba (cumple / no cumple / con observaciones) · ANOVA de fuentes de variación (técnico × patrón) con tablas de medias · α, confianza y Shapiro-Wilk fijos; solo se configuran los límites · informe con significado metrológico y tablas de contexto.
+>
+> Si ya tenías Testeo 1–4 de la versión anterior, la app los conserva renombrados como «Testeo N (bases anteriores)» y crea los nuevos.
 
 Entrega 3: **motor estadístico, conclusiones, comentarios, versión 2 e informe PDF.** El ZIP trae el proyecto completo (sin `datos_locales/` ni `.venv/`). Se descomprime encima de tu carpeta en la rama `prototipo-alejandra`.
 
@@ -19,11 +21,11 @@ cd C:\ruta\a\analitica-verificacion-metodos
 git switch prototipo-alejandra
 git status                                          # que no haya cambios pendientes que te importen
 
-Expand-Archive -Path "$HOME\Downloads\entrega_v3_2_testeos_informe.zip" -DestinationPath . -Force
+Expand-Archive -Path "$HOME\Downloads\entrega_v4_panel_anova.zip" -DestinationPath . -Force
 
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt           # instala las 5 librerías nuevas
-python -m pytest -q                                 # deben pasar 120 pruebas
+python -m pytest -q                                 # deben pasar 123 pruebas
 streamlit run app.py
 ```
 

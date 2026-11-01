@@ -229,3 +229,47 @@ def qq_grid(resultado: dict, objeto: str) -> bytes | None:
     nombre = "unidades del sesgo" if objeto == "sesgo" else "residuos (precisión)"
     fig.suptitle(f"Gráficos cuantil-cuantil: {nombre}. Naranja = se rechaza la normalidad", fontsize=8, color=TINTA, x=0.01, ha="left")
     return _png(fig)
+
+
+def interaccion_grid(resultado: dict) -> bytes | None:
+    """Medias por combinación de factores en cada punto (líneas paralelas = sin interacción)."""
+    rs = [r for r in resultado["resultados"] if r.get("caracteristica") == "fuentes_variacion" and r["estado"] == "APLICABLE"]
+    if not rs:
+        return None
+    n = len(rs)
+    cols = min(4, n)
+    filas = int(np.ceil(n / cols))
+    fig, ejes = plt.subplots(filas, cols, figsize=(6.6, 1.75 * filas + 0.5), squeeze=False)
+    paleta = [SERIE, ACENTO, "#1baf7a", "#eda100", "#6250d6"]
+    leyenda = None
+    for k, r in enumerate(rs):
+        ax = ejes[k // cols][k % cols]
+        ctx = r["estimacion"]["contexto"]
+        cruce = ctx.get("cruce")
+        if cruce:
+            xs = cruce["niveles_columnas"]
+            for i, fila in enumerate(cruce["datos"]):
+                ax.plot(range(len(xs)), [fila.get(c) for c in xs], marker="o", ms=3.5, lw=1.4, color=paleta[i % len(paleta)],
+                        label=fila["nivel"])
+            ax.set_xticks(range(len(xs)), xs, fontsize=6)
+            leyenda = (cruce["filas"], cruce["columnas"])
+        else:
+            nombre, niveles = next(iter(ctx["por_factor"].items()))
+            ax.plot(range(len(niveles)), [x["media"] for x in niveles], marker="o", ms=3.5, lw=1.4, color=SERIE)
+            ax.set_xticks(range(len(niveles)), [x["nivel"] for x in niveles], fontsize=6)
+        inf = r["estimacion"].get("influyen") or []
+        _estilo(ax, _corto(r["agrupacion"].replace("nivel ", "")) + ("\ninfluye: " + ", ".join(inf) if inf else "\nninguna influye"), "")
+        ax.title.set_fontsize(6.5)
+        ax.tick_params(labelsize=6)
+    for k in range(n, filas * cols):
+        ejes[k // cols][k % cols].axis("off")
+    if leyenda:
+        h, l = ejes[0][0].get_legend_handles_labels()
+        fig.legend(h, l, loc="upper center", ncols=min(6, len(l)), fontsize=6.5, frameon=False,
+                   title=f"Líneas = {leyenda[0]} · eje x = {leyenda[1]}", title_fontsize=6.5)
+        fig.subplots_adjust(top=0.82)
+    buf = io.BytesIO()
+    fig.tight_layout(rect=(0, 0, 1, 0.88 if leyenda else 1))
+    fig.savefig(buf, format="png", dpi=160)
+    plt.close(fig)
+    return buf.getvalue()
