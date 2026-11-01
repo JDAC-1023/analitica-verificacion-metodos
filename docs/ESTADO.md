@@ -25,6 +25,8 @@ Comprobado el 2026-11-01 con 120 pruebas automatizadas (todas aprobadas), prueba
 | 10 · Informe | Versionado, comentarios, clonación, PDF leído en la prueba | test_analisis_servicio, test_interfaz |
 | 8 · Documentación | Insumos técnicos en `docs/` (4 generados desde el código) | — |
 
+**Testeos, limpieza y lenguaje sencillo (3.2):** Testeo 1–4 se crean solos al abrir la app desde `data/estudios_prueba/` (una vez por carpeta de datos). Reporte de limpieza en pantalla y en PDF: pasos, 20 reglas con sus hallazgos, transformaciones autorizadas y aplicadas, exclusiones, lo que nunca se hace y herramientas. Cada prueba explica en palabras sencillas qué hace y por qué se aplicó o no (`src/motor/lenguaje.py`). Informe PDF con portada, resumen para todos, gráficos de resumen y tablas con color.
+
 ## Funciona con limitaciones conocidas
 
 - **Persistencia local** (archivos en `datos_locales/`). Sirve entre sesiones y reinicios en el mismo equipo. **No** se comparte entre Jessica y Juan David ni sobrevive en Streamlit Community Cloud (su disco se borra al reiniciar). Por eso Supabase es el siguiente paso de infraestructura.

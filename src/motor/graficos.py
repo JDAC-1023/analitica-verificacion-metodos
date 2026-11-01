@@ -119,3 +119,113 @@ def generar(resultado: dict) -> dict[str, bytes]:
             if png:
                 salida[clave] = png
     return salida
+
+
+# ------------------------------------------------------------------ figuras de resumen (informe)
+def _niveles(resultado):
+    vistos = {}
+    for d in resultado["datos"]:
+        vistos.setdefault(d["punto_id"], d["punto"])
+    return list(vistos.items())
+
+
+def _corto(etiqueta: str) -> str:
+    return etiqueta.split(" · ")[0]
+
+
+def resumen_sesgo(resultado: dict, limite: float | None = None) -> bytes | None:
+    filas = [r for r in resultado["resultados"] if r["etapa"] == "desempeno" and r["caracteristica"] == "sesgo"
+             and r["estado"] == "APLICABLE" and r.get("estimacion")]
+    if not filas:
+        return None
+    etiquetas = [_corto(r["agrupacion"].replace("nivel ", "")) for r in filas]
+    vals = [r["estimacion"]["valor"] for r in filas]
+    fig, ax = plt.subplots(figsize=(6.6, 2.7))
+    x = np.arange(len(filas))
+    for i, r in enumerate(filas):
+        ic = r.get("ic")
+        if ic and ic[0] is not None:
+            ax.vlines(i, ic[0], ic[1], color=SERIE, linewidth=2, zorder=2)
+    ax.scatter(x, vals, s=36, color=SERIE, edgecolor="white", linewidth=1.2, zorder=3)
+    ax.axhline(0, color=TINTA_2, linewidth=0.8)
+    if limite is not None:
+        ax.axhspan(-limite, limite, color="#1baf7a", alpha=0.08, zorder=0)
+        for s in (-1, 1):
+            ax.axhline(s * limite, color="#1baf7a", linewidth=1, linestyle="--")
+        ax.annotate(f"límite ±{limite:g}", (len(filas) - 0.6, limite), fontsize=7, color=TINTA_2, va="bottom", ha="right")
+    ax.set_xticks(x, etiquetas, fontsize=7)
+    _estilo(ax, "Sesgo por punto (punto = estimación · barra = intervalo de confianza 95 %)", resultado["objeto"]["unidad"])
+    return _png(fig)
+
+
+def resumen_precision(resultado: dict) -> bytes | None:
+    series = {}
+    for r in resultado["resultados"]:
+        if r["etapa"] == "desempeno" and r["estado"] == "APLICABLE" and r["caracteristica"] in ("repetibilidad", "precision_intermedia", "reproducibilidad"):
+            series.setdefault(r["caracteristica"], []).append((_corto(r["agrupacion"].replace("nivel ", "")), r["estimacion"]["valor"]))
+    if not series:
+        return None
+    nombres = {"repetibilidad": "Repetibilidad s_r", "precision_intermedia": "Precisión intermedia s_I", "reproducibilidad": "Reproducibilidad s_R"}
+    colores = [SERIE, ACENTO, "#1baf7a"]
+    etiquetas = [e for e, _ in next(iter(series.values()))]
+    fig, ax = plt.subplots(figsize=(6.6, 2.7))
+    ancho = 0.8 / len(series)
+    x = np.arange(len(etiquetas))
+    for k, (car, pares) in enumerate(series.items()):
+        mapa = dict(pares)
+        ax.bar(x + (k - (len(series) - 1) / 2) * ancho, [mapa.get(e, 0) for e in etiquetas], width=ancho * 0.92,
+               color=colores[k % 3], label=nombres[car], zorder=3)
+    ax.set_xticks(x, etiquetas, fontsize=7)
+    ax.legend(fontsize=7, frameon=False, loc="upper left", ncols=len(series))
+    _estilo(ax, "Precisión por punto (desviación estándar)", resultado["objeto"]["unidad"])
+    ax.set_ylim(0, ax.get_ylim()[1] * 1.18)
+    return _png(fig)
+
+
+def puntos_grid(resultado: dict) -> bytes | None:
+    niveles = _niveles(resultado)
+    if not niveles:
+        return None
+    cols = 4 if len(niveles) > 4 else len(niveles)
+    filas = int(np.ceil(len(niveles) / cols))
+    fig, axs = plt.subplots(filas, cols, figsize=(6.8, 1.75 * filas + 0.3), squeeze=False)
+    for ax in axs.flat:
+        ax.set_visible(False)
+    for ax, (pid, et) in zip(axs.flat, niveles):
+        ax.set_visible(True)
+        datos = [d for d in resultado["datos"] if d["punto_id"] == pid]
+        celdas = sorted({d["celda"] for d in datos})
+        for i, c in enumerate(celdas):
+            v = np.array([d["valor"] for d in datos if d["celda"] == c])
+            ax.scatter(np.full(len(v), i), v, s=7, color=SERIE, alpha=0.8, zorder=3)
+        ax.set_xticks([])
+        _estilo(ax, _corto(et))
+        ax.title.set_fontsize(7.5)
+        ax.tick_params(labelsize=6)
+    fig.suptitle("Resultados por grupo de condiciones en cada punto (cada columna de puntos = un grupo)", fontsize=8, color=TINTA, x=0.01, ha="left")
+    return _png(fig)
+
+
+def qq_grid(resultado: dict, objeto: str) -> bytes | None:
+    rs = [r for r in resultado["resultados"] if r["etapa"] == "normalidad" and r["estado"] == "APLICABLE"
+          and any(g.startswith(f"qq:{objeto}:") for g in r["graficos"])]
+    if not rs:
+        return None
+    cols = 4 if len(rs) > 4 else len(rs)
+    filas = int(np.ceil(len(rs) / cols))
+    fig, axs = plt.subplots(filas, cols, figsize=(6.8, 1.75 * filas + 0.3), squeeze=False)
+    for ax in axs.flat:
+        ax.set_visible(False)
+    for ax, r in zip(axs.flat, rs):
+        ax.set_visible(True)
+        v = np.array([f["valor"] for f in r["tabla"]])
+        (teo, ord_), (pend, inter, _) = stats.probplot(v, dist="norm")
+        color = ACENTO if r["decision_inferencial"] == "Se rechaza H0" else SERIE
+        ax.scatter(teo, ord_, s=7, color=color, zorder=3)
+        ax.plot(teo, pend * np.asarray(teo) + inter, color=TINTA_2, linewidth=0.8)
+        _estilo(ax, f"{_corto(r['agrupacion'].replace('nivel ', ''))} · p={r['p_valor']:.3f}")
+        ax.title.set_fontsize(7.5)
+        ax.tick_params(labelsize=6)
+    nombre = "unidades del sesgo" if objeto == "sesgo" else "residuos (precisión)"
+    fig.suptitle(f"Gráficos cuantil-cuantil: {nombre}. Naranja = se rechaza la normalidad", fontsize=8, color=TINTA, x=0.01, ha="left")
+    return _png(fig)

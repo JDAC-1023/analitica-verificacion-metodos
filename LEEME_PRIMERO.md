@@ -1,6 +1,6 @@
 # Cómo incorporar esta entrega (Windows · PowerShell)
 
-> **Actualización 3.1:** botón «Siguiente: Análisis estadístico» en Datos preparados, aviso claro si faltan librerías y los 4 estudios de prueba (`data/estudios_prueba/`) que se crean con un clic en **Inicio → Crear los estudios de prueba**.
+> **Actualización 3.2:** al abrir la app se crean solos **Testeo 1–4** en la base de datos (con sus 288 mediciones cargadas, revisadas, aprobadas y analizadas). Nuevo **reporte de limpieza** (Datos preparados), explicaciones en lenguaje sencillo de por qué se aplica o no cada prueba, e informe PDF rediseñado.
 
 Entrega 3: **motor estadístico, conclusiones, comentarios, versión 2 e informe PDF.** El ZIP trae el proyecto completo (sin `datos_locales/` ni `.venv/`). Se descomprime encima de tu carpeta en la rama `prototipo-alejandra`.
 
@@ -19,7 +19,7 @@ cd C:\ruta\a\analitica-verificacion-metodos
 git switch prototipo-alejandra
 git status                                          # que no haya cambios pendientes que te importen
 
-Expand-Archive -Path "$HOME\Downloads\entrega_v3_1_motor_pruebas.zip" -DestinationPath . -Force
+Expand-Archive -Path "$HOME\Downloads\entrega_v3_2_testeos_informe.zip" -DestinationPath . -Force
 
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt           # instala las 5 librerías nuevas

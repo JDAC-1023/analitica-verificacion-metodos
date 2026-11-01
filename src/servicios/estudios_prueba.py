@@ -146,11 +146,12 @@ def valores_del_archivo(df: pd.DataFrame, columnas: list[dict]) -> pd.DataFrame:
 
 
 def crear_estudio_desde_archivo(repo: Repositorio, contenido: bytes, nombre_archivo: str, nombre: str, usuario: str,
-                                ejecutar: bool = True) -> dict:
+                                ejecutar: bool = True, escenario: str = "") -> dict:
     base = repo.crear_estudio(nombre, usuario)
     e, df, columnas = leer_definicion(contenido, base.codigo, nombre)
     e.creado_en = base.creado_en
-    e.uso_previsto = f"Base de prueba del motor importada desde «{nombre_archivo}» (datos sintéticos)."
+    e.uso_previsto = (f"Testeo del motor — escenario: {escenario}. " if escenario else "") + \
+        f"Datos sintéticos importados desde «{nombre_archivo}»; no válidos como resultados de calibración."
     repo.guardar_estudio(e, usuario, f"Importado desde {nombre_archivo}")
     repo.aprobar_version(e, usuario)
     lleno = diligenciar_plantilla(generar_plantilla(e), valores_del_archivo(df, columnas))
@@ -179,13 +180,24 @@ def crear_estudio_desde_archivo(repo: Repositorio, contenido: bytes, nombre_arch
     return salida
 
 
-def nombre_escenario(archivo: str) -> str:
-    base = Path(archivo).stem
-    base = re.sub(r"^[0-9a-f]{8}-", "", base)          # prefijo de adjunto
-    return "Prueba " + base.replace("_", " ")
+ESCENARIOS = {
+    "01": "Datos normales · no cumple",
+    "02": "Datos normales · cumple",
+    "03": "Datos no normales · no cumple",
+    "04": "Datos no normales · cumple",
+}
+
+
+def escenario(archivo: str) -> tuple[int, str]:
+    """«01_Normal_No_Cumple_3_Variables.xlsx» → (1, «Datos normales · no cumple»)."""
+    m = re.match(r"(?:[0-9a-f]{8}-)?(\d{2})_", Path(archivo).name)
+    if not m:
+        raise ErrorImportacion(f"El archivo «{archivo}» debe empezar por 01_, 02_, 03_ o 04_.")
+    return int(m.group(1)), ESCENARIOS.get(m.group(1), Path(archivo).stem)
 
 
 def crear_estudios_prueba(repo: Repositorio, usuario: str, carpeta: Path | None = None) -> list[dict]:
+    """Crea «Testeo 1» … «Testeo 4» desde data/estudios_prueba si aún no existen."""
     carpeta = Path(carpeta or CARPETA_PRUEBAS)
     archivos = sorted(carpeta.glob("*.xlsx"))
     if not archivos:
@@ -193,9 +205,19 @@ def crear_estudios_prueba(repo: Repositorio, usuario: str, carpeta: Path | None 
     existentes = {x["nombre"] for x in repo.listar_estudios()}
     salida = []
     for a in archivos:
-        nombre = nombre_escenario(a.name)
+        n, desc = escenario(a.name)
+        nombre = f"Testeo {n}"
         if nombre in existentes:
             salida.append({"nombre": nombre, "omitido": "ya existe"})
             continue
-        salida.append(crear_estudio_desde_archivo(repo, a.read_bytes(), a.name, nombre, usuario))
+        r = crear_estudio_desde_archivo(repo, a.read_bytes(), a.name, nombre, usuario, escenario=desc)
+        salida.append(r)
     return salida
+
+
+def asegurar_testeos(repo: Repositorio) -> list[dict]:
+    """Se llama al abrir la aplicación: deja los 4 testeos en la base de datos local si faltan."""
+    try:
+        return [x for x in crear_estudios_prueba(repo, "sistema (carga inicial)") if "codigo" in x]
+    except ErrorImportacion:
+        return []

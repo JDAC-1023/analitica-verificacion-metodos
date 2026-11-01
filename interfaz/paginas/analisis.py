@@ -18,7 +18,8 @@ from src.motor.configuracion import (CARACTERISTICAS, ESTADOS_CARACTERISTICA, OP
                                      REGLAS_DECISION, CaracteristicaConfig, ConfiguracionAnalisis, CriterioMotor, Exclusion,
                                      ReferenciaNivel, ReglaDerivacion)
 from src.motor.datos import ErrorDatosMotor
-from src.motor.motor import ESTADOS_COLOR, ETAPAS, ejecutar
+from src.motor.lenguaje import corto, en_palabras, explicar, hallazgos, resumen_global
+from src.motor.motor import ETAPAS, ejecutar
 from src.motor.plantillas import fmt, fmt_p
 from src.persistencia.repositorio import ErrorRepositorio
 from src.servicios.analisis import (ErrorAnalisis, bitacora_analisis, datos_de_preparacion, derivar_version,
@@ -68,9 +69,8 @@ ejecutada = resultado is not None
 clave = f"{codigo}_{cfg_guardada.version}_{'n' if version_sel == NUEVA else 'g'}"
 
 if ejecutada:
-    final = resultado["conclusion_final"]
-    st.badge(f"Conclusión consolidada: {final['estado']}", color=ESTADOS_COLOR.get(final["estado"], "violet"),
-             icon=":material/fact_check:")
+    _g = resumen_global(resultado)
+    st.badge(f"Conclusión: {_g['etiqueta']}", color=_g["color"], icon=":material/fact_check:")
 
 t_conf, t_res, t_concl, t_red, t_inf, t_hist = st.tabs(
     [":material/tune: Configurar", ":material/query_stats: Resultados por etapa", ":material/rate_review: Conclusiones",
@@ -228,6 +228,32 @@ def _formulario(cfg0: ConfiguracionAnalisis, bloqueado: bool) -> ConfiguracionAn
     return cfg
 
 
+def _agrupar(resultados: list[dict]) -> list[tuple[str, list[dict]]]:
+    """Resultados agrupados por prueba, en el orden en que aparecen."""
+    grupos: dict[str, list[dict]] = {}
+    for x in resultados:
+        clave_t = x["tecnica"].split(" (")[0] if x["etapa"] == "desempeno" and x["tecnica"].startswith("Sesgo") else x["tecnica"]
+        grupos.setdefault(clave_t, []).append(x)
+    return list(grupos.items())
+
+
+def _tabla_en_palabras(resultados: list[dict]) -> pd.DataFrame:
+    filas = []
+    for etapa, nombre in ETAPAS:
+        for tecnica, xs in _agrupar([x for x in resultados if x["etapa"] == etapa]):
+            estados = {}
+            for x in xs:
+                estados.setdefault(explicar(x)["estado"], []).append(x)
+            for est, ys in estados.items():
+                ex = explicar(ys[0])
+                if ys[0]["estado"] == "APLICABLE":
+                    porque = f"Se aplica en {len(ys)} grupo(s). {ex['que_hace']}"
+                else:
+                    porque = ex["explicacion"] + (f" → {ex['que_hacer']}" if ex["que_hacer"] else "")
+                filas.append({"Etapa": nombre, "Prueba": tecnica, "¿Se aplica?": f"{ex['icono']} {est}", "Por qué / qué pasó": porque})
+    return pd.DataFrame(filas)
+
+
 def _vista_previa(cfg: ConfiguracionAnalisis) -> None:
     tablas, e, prep = st.session_state[f"tablas_{clave}"]
     try:
@@ -235,22 +261,21 @@ def _vista_previa(cfg: ConfiguracionAnalisis) -> None:
     except ErrorDatosMotor as exc:
         st.error(str(exc), icon=":material/error:")
         return
-    st.markdown("##### :material/bolt: Ruta de decisión en tiempo real")
-    st.caption("Se recalcula con cada cambio, sin guardar. Muestra qué técnicas aplican y por qué.")
-    ap = pd.DataFrame([{"Etapa": x["etapa"], "Técnica": x["tecnica"], "Agrupación": x["agrupacion"], "Estado": x["estado"],
-                        "Motivo": " ".join(x["motivos"][:1])} for x in r["resultados"]])
-    orden = {k: i for i, (k, _) in enumerate(ETAPAS)}
-    resumen = ap.groupby(["Etapa", "Técnica", "Estado"], sort=False).size().rename("Grupos").reset_index()
-    resumen = resumen.sort_values("Etapa", key=lambda s: s.map(orden), kind="stable")
+    st.markdown("##### :material/bolt: Qué va a hacer el motor (se actualiza mientras configuras)")
+    st.caption("Cada fila es una prueba. Si no se aplica, te decimos por qué en palabras sencillas.")
     if not any(cfg.activa(c) for c in CARACTERISTICAS):
         st.warning("Ninguna característica está marcada como REQUERIDA o SELECCIONADA: no se calculará desempeño.",
                    icon=":material/checklist:")
-    tabla(resumen)
+    df = _tabla_en_palabras(r["resultados"])
+    for etapa_txt, sub in df.groupby("Etapa", sort=False):
+        st.markdown(f"**{etapa_txt}**")
+        st.markdown("\n".join(f"- {f['¿Se aplica?']} · **{f['Prueba']}** — {f['Por qué / qué pasó']}" for _, f in sub.iterrows()))
     with st.expander("Árbol de decisiones (pregunta → respuesta → evidencia → regla)"):
         tabla(pd.DataFrame(r["arbol"]).rename(columns={"pregunta": "Pregunta", "respuesta": "Respuesta", "evidencia": "Evidencia", "regla": "Regla"}))
     for aviso in r["ruta"]["avisos"]:
         st.warning(aviso, icon=":material/alt_route:")
-    st.info(f"Conclusión prevista: **{r['conclusion_final']['estado']}** — {r['conclusion_final']['texto']}", icon=":material/visibility:")
+    g = resumen_global(r)
+    st.info(f"Conclusión prevista: **{g['etiqueta']}** — {g['texto']}", icon=":material/visibility:")
 
 
 with t_conf:
@@ -301,44 +326,119 @@ def _comentarios(etapa: str) -> None:
                     st.error(str(exc))
 
 
-def _detalle(r: dict, figs: dict) -> None:
-    color = ESTADOS_COLOR.get(r.get("decision_metrologica") or r["estado"], "gray")
-    titulo = f"{r['tecnica']} · {r['agrupacion']}"
-    with st.expander(f":{color}[●] {titulo}"):
-        if r["texto"]:
-            st.write(r["texto"])
-        filas = [("Estado", r["estado"]), ("Origen de la regla", r["origen_regla"]), ("Referencia", r["referencia"]),
-                 ("Fórmula", r["formula"]), ("Estadístico", f"{r['estadistico'].get('simbolo', '')} = {fmt(r['estadistico'].get('valor'))}" if r["estadistico"] else ""),
-                 ("gl", fmt(r["gl"], 4) if isinstance(r["gl"], (int, float)) else (json.dumps(r["gl"]) if r["gl"] else "")),
-                 ("Valor p", fmt_p(r["p_valor"]) if r["p_valor"] is not None else ""),
-                 ("Críticos", "; ".join(f"{a}: {fmt(b)}" for a, b in r["criticos"].items() if a != "origen") + (f" ({r['criticos'].get('origen')})" if r["criticos"] else "")),
-                 ("IC", f"[{fmt(r['ic'][0])}; {fmt(r['ic'][1])}]" if r["ic"] and r["ic"][0] is not None else ""),
-                 ("Estimación", f"{r['estimacion'].get('nombre')} = {fmt(r['estimacion'].get('valor'))} {r['estimacion'].get('unidad') or ''}" if r["estimacion"] and r["etapa"] == "desempeno" else ""),
-                 ("Decisión inferencial", r["decision_inferencial"]), ("Decisión metrológica", r["decision_metrologica"]),
-                 ("Motivos", " ".join(r["motivos"])), ("Limitaciones", " ".join(r["limitaciones"]))]
-        tabla(pd.DataFrame([f for f in filas if f[1]], columns=["Campo", "Valor"]))
-        if r["tabla"] and r["etapa"] != "normalidad":
-            st.caption("Cálculos intermedios")
-            tabla(pd.DataFrame(r["tabla"]).drop(columns=["ids"], errors="ignore"))
-        for g in r["graficos"]:
-            if g in figs:
-                st.image(figs[g], width=420 if g.startswith("qq") else "stretch")
+def _detalle_tecnico(r: dict) -> None:
+    filas = [("Estado", r["estado"]), ("Origen de la regla", r["origen_regla"]), ("Referencia", r["referencia"]),
+             ("Fórmula", r["formula"]), ("Estadístico", f"{r['estadistico'].get('simbolo', '')} = {fmt(r['estadistico'].get('valor'))}" if r["estadistico"] else ""),
+             ("gl", fmt(r["gl"], 4) if isinstance(r["gl"], (int, float)) else (json.dumps(r["gl"]) if r["gl"] else "")),
+             ("Valor p", fmt_p(r["p_valor"]) if r["p_valor"] is not None else ""),
+             ("Críticos", "; ".join(f"{a}: {fmt(b)}" for a, b in r["criticos"].items() if a != "origen") + (f" ({r['criticos'].get('origen')})" if r["criticos"] else "")),
+             ("IC", f"[{fmt(r['ic'][0])}; {fmt(r['ic'][1])}]" if r["ic"] and r["ic"][0] is not None else ""),
+             ("Decisión inferencial", r["decision_inferencial"]), ("Decisión metrológica", r["decision_metrologica"]),
+             ("Motivos", " ".join(r["motivos"])), ("Limitaciones", " ".join(r["limitaciones"]))]
+    st.markdown(f"**{r['agrupacion']}**")
+    if r["texto"]:
+        st.caption(r["texto"])
+    tabla(pd.DataFrame([f for f in filas if f[1]], columns=["Campo", "Valor"]))
+    if r["tabla"] and r["etapa"] != "normalidad" and len(r["tabla"]) <= 40:
+        tabla(pd.DataFrame(r["tabla"]).drop(columns=["ids"], errors="ignore"))
+
+
+def _frase_grupo(tecnica: str, xs: list[dict]) -> str:
+    """Una frase que resume la prueba en todos los puntos."""
+    significados = {}
+    for x in xs:
+        significados[corto(x) or "calculado"] = significados.get(corto(x) or "calculado", 0) + 1
+    e = [x["estimacion"]["valor"] for x in xs if x.get("estimacion") and x["estimacion"].get("valor") is not None and x["etapa"] == "desempeno"]
+    txt = ""
+    if e:
+        txt = f"Valores entre **{fmt(min(e))}** y **{fmt(max(e))} {xs[0]['unidad']}** en {len(xs)} punto(s). "
+    txt += "Resultado: " + "; ".join(f"{k.lower()} en {v}" for k, v in significados.items()) + "."
+    decs = {}
+    for x in xs:
+        d = explicar(x)["decision"]
+        if d:
+            decs[d] = decs.get(d, 0) + 1
+    if decs:
+        txt += " Frente al criterio: " + "; ".join(f"{k.lower()} en {v}" for k, v in decs.items()) + "."
+        if "Sin criterio" in decs:
+            txt += " *(«Sin criterio»: falta definir el límite de aceptación para decir si cumple.)*"
+    return txt
+
+
+def _bloque_prueba(tecnica: str, xs: list[dict], figs: dict) -> None:
+    ex0 = explicar(xs[0])
+    with st.container(border=True):
+        c1, c2 = st.columns([4, 1.4], vertical_alignment="center")
+        c1.markdown(f"**{tecnica}**  \n:gray[{ex0['que_hace']}]")
+        aplicados = [x for x in xs if x["estado"] == "APLICABLE"]
+        if aplicados:
+            c2.badge(f"Se aplicó · {len(aplicados)} grupo(s)", color="green", icon=":material/check_circle:")
+        else:
+            c2.badge(ex0["estado"], color=ex0["color"], icon=":material/do_not_disturb_on:" if xs[0]["estado"] == "NO_APLICABLE" else ":material/info:")
+        if not aplicados:
+            st.markdown(f"{ex0['explicacion']}" + (f"  \n**Qué haría falta:** {ex0['que_hacer']}" if ex0["que_hacer"] else ""))
+        elif len(xs) == 1:
+            st.markdown(explicar(xs[0])["explicacion"])
+        else:
+            filas = []
+            for x in xs:
+                ex = explicar(x)
+                est = x.get("estadistico") or {}
+                e = x.get("estimacion") or {}
+                valor = (f"{e['nombre']} = {fmt(e['valor'])} {x['unidad']}" if x["etapa"] == "desempeno" and e.get("valor") is not None
+                         else (f"{est.get('simbolo')} = {fmt(est.get('valor'))}" if est.get("valor") is not None else "—"))
+                if x.get("p_valor") is not None:
+                    valor += f" · p = {fmt_p(x['p_valor'])}"
+                filas.append({"Punto / grupo": x["agrupacion"].replace("nivel ", "").replace(" · Temperatura", "").split(" · objeto")[0]
+                              + (" · unidades" if "unidades del sesgo" in x["agrupacion"] else " · residuos" if "residuos" in x["agrupacion"] else ""),
+                              "Resultado": valor, "Qué significa": corto(x) if x["estado"] == "APLICABLE" else ex["estado"],
+                              "Decisión": (f"{ex['decision_icono']} {ex['decision']}" if ex["decision"] else "")})
+            st.markdown(explicar(aplicados[0])["explicacion"] if len(aplicados) == 1 else _frase_grupo(tecnica, aplicados))
+            df_niv = pd.DataFrame(filas)
+            if not df_niv["Decisión"].astype(bool).any():
+                df_niv = df_niv.drop(columns=["Decisión"])
+            tabla(df_niv)
+        with st.expander("Ver detalle técnico"):
+            for x in xs:
+                _detalle_tecnico(x)
 
 
 with t_res:
     if not ejecutada:
         st.info("Ejecuta el análisis para ver los resultados por etapa.", icon=":material/play_arrow:")
     else:
-        figs = graficos.generar(resultado)
+        g = resumen_global(resultado)
+        with st.container(border=True):
+            st.markdown(f"#### :{g['color']}[:material/verified:] {g['etiqueta']}")
+            st.write(g["texto"])
+            st.markdown("**Lo que encontramos**")
+            for t in hallazgos(resultado):
+                st.markdown(f"- {t}")
+        cols = st.columns(2)
+        for col, fig in zip(cols, (graficos.resumen_sesgo(resultado), graficos.resumen_precision(resultado))):
+            if fig:
+                col.image(fig, width="stretch")
         st.caption(f"Ejecutado {resultado['meta']['ejecutado_en'][:16].replace('T', ' ')} por {resultado['meta'].get('ejecutado_por', '—')} · "
-                   f"huella `{resultado['meta']['huella_resultado'][:16]}…` · {resultado['objeto']['descripcion']}")
+                   f"{resultado['objeto']['descripcion']} · huella `{resultado['meta']['huella_resultado'][:12]}…`")
+        figs = {}
         for etapa, nombre in ETAPAS:
-            st.markdown(f"#### {nombre}")
-            st.info(resultado["conclusiones"].get(etapa, ""), icon=":material/smart_toy:")
-            for r in [x for x in resultado["resultados"] if x["etapa"] == etapa]:
-                _detalle(r, figs)
+            st.markdown(f"### {nombre}")
+            st.info(en_palabras(resultado["conclusiones"].get(etapa, "")), icon=":material/smart_toy:")
+            for tecnica, xs in _agrupar([x for x in resultado["resultados"] if x["etapa"] == etapa]):
+                _bloque_prueba(tecnica, xs, figs)
+            if etapa == "limpieza":
+                fig = graficos.puntos_grid(resultado)
+                if fig:
+                    with st.expander("Ver los datos por punto"):
+                        st.image(fig, width="stretch")
+            if etapa == "normalidad":
+                for objeto in ("sesgo", "precision"):
+                    fig = graficos.qq_grid(resultado, objeto)
+                    if fig:
+                        with st.expander(f"Gráficos cuantil-cuantil ({'unidades del sesgo' if objeto == 'sesgo' else 'residuos'})"):
+                            st.image(fig, width="stretch")
             _comentarios(etapa)
-        with st.expander(":material/account_tree: Árbol completo de decisiones"):
+        with st.expander(":material/account_tree: Árbol completo de decisiones (pregunta → respuesta → evidencia → regla)"):
             tabla(pd.DataFrame(resultado["arbol"]))
 
 # ------------------------------------------------------------------ 3 · conclusiones
@@ -348,10 +448,10 @@ with t_concl:
     else:
         st.markdown("#### Conclusiones técnicas preliminares (automáticas)")
         for etapa, nombre in ETAPAS:
-            st.markdown(f"**{nombre}.** {resultado['conclusiones'].get(etapa, '')}")
-        final = resultado["conclusion_final"]
+            st.markdown(f"**{nombre}.** {en_palabras(resultado['conclusiones'].get(etapa, ''))}")
+        g = resumen_global(resultado)
         with st.container(border=True):
-            st.markdown(f"##### :{ESTADOS_COLOR.get(final['estado'], 'violet')}[:material/verified:] {final['estado']}")
+            st.markdown(f"##### :{g['color']}[:material/verified:] {g['etiqueta']}")
             st.write(resultado["conclusiones"]["conclusion_final"])
         tabla(pd.DataFrame([{"Característica": f["caracteristica"], "Configuración": f["estado_configurado"], "Ejecución": f["ejecucion"],
                              "Decisión": f["decision"], "Referencia": f["referencia"]} for f in resultado["caracteristicas"]]))
@@ -416,8 +516,13 @@ with t_inf:
             estudio_v, _ = repo.obtener_version(codigo, resultado["meta"]["version_diseno"])
             control = {"fecha": fecha.isoformat(), "elaborado_por": elab, "revisado_por": rev, "autorizado_por": aut}
             with st.spinner("Generando informe…"):
+                from src.servicios import reporte_limpieza
+                try:
+                    limp = reporte_limpieza.construir(repo, codigo, guardado["config"]["preparacion_id"], resultado)
+                except Exception:  # noqa: BLE001 - el informe sale aunque falte la carga original
+                    limp = None
                 pdf = generar_informe(resultado, guardado["config"], estudio_v, guardado["comentarios"], historial(repo, codigo),
-                                      bitacora_analisis(repo, codigo), control)
+                                      bitacora_analisis(repo, codigo), control, limp)
             nombre = repo.guardar_informe(codigo, version_sel, pdf, {**control, "emitido_por": usuario(), "sha256": sha256_bytes(pdf),
                                                                      "fecha": fecha.isoformat()})
             st.session_state[f"pdf_{clave}"] = (nombre, pdf)

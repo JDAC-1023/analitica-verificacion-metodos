@@ -272,7 +272,9 @@ def _precision_intermedia(ctx: Contexto) -> None:
         if len(c) < 4:
             lim.append(f"Solo {len(c)} grupos: la varianza entre grupos se estima con pocos grados de libertad.")
         lev = None
-        if (c["n"] >= 2).all() and len(c) >= 2:
+        if (c["n"] < 3).any():
+            lim.append("Homogeneidad de varianzas (Levene) no evaluada: requiere al menos 3 resultados por grupo.")
+        elif len(c) >= 2:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 grupos = [cg["valor"].to_numpy(float) for _, cg in g.groupby("celda")]

@@ -70,7 +70,7 @@ def test_flujo_completo_version2_comentarios_e_informe(repo, estudio_aprobado, p
     nombre = repo.guardar_informe(e.codigo, 1, pdf, {"fecha": "2026-11-01", "emitido_por": "ana"})
     assert repo.obtener_informe(e.codigo, 1, nombre) == pdf and repo.listar_informes(e.codigo)
     texto = " ".join(p.extract_text() for p in PdfReader(__import__("io").BytesIO(pdf)).pages)
-    for fragmento in ("Elaboró", "Revisó", "Autorizó", "Juan David", "Marco teórico", "Revisada la bitácora",
+    for fragmento in ("Elaboró", "Revisó", "Autorizó", "Juan David", "Resumen en lenguaje sencillo", "Fundamento", "Revisada la bitácora",
                       "Referencias", "Shapiro, S. S., & Wilk", "Página 1 de", "CONFORME"):
         assert fragmento in texto, fragmento
 
@@ -88,7 +88,8 @@ def test_crear_estudios_de_prueba(repo):
     aceptadas cada uno, conjunto aprobado y análisis v1 de la corrección ejecutado sin criterios; volver a pulsar no duplica."""
     from src.servicios.estudios_prueba import crear_estudios_prueba
     creados = crear_estudios_prueba(repo, "ana")
-    assert len(creados) == 4
+    assert len(creados) == 4 and [x["nombre"] for x in creados] == ["Testeo 1", "Testeo 2", "Testeo 3", "Testeo 4"]
+    assert "no cumple" in repo.obtener_estudio(creados[0]["codigo"]).uso_previsto
     for x in creados:
         assert x["mediciones"] == 288 and x["conteos"]["aceptados"] == 288 and x["analisis"] == "CALCULADO_SIN_EVALUACION"
         r = repo.obtener_analisis(x["codigo"], 1)["resultado"]

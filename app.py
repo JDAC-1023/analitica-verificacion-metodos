@@ -13,6 +13,19 @@ from interfaz.comun import badge_estado_diseno, cargar_estilos, repositorio  # n
 
 cargar_estilos()
 
+
+@st.cache_resource(show_spinner="Preparando los estudios de testeo…")
+def _testeos_listos() -> bool:
+    """Carga una sola vez los 4 estudios de testeo (data/estudios_prueba) en la base de datos local."""
+    import os
+    if os.environ.get("AVM_SIN_TESTEOS") != "1":
+        from src.servicios.estudios_prueba import asegurar_testeos
+        asegurar_testeos(repositorio())
+    return True
+
+
+_testeos_listos()
+
 PAGINA_ASISTENTE = "Crear / continuar estudio"
 paginas = {
     "": [

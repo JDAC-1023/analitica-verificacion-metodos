@@ -2,14 +2,13 @@ import pandas as pd
 import streamlit as st
 
 from interfaz.comun import PAGINAS, banda_de_pasos, estudio_actual, repositorio, usuario
-from src.servicios.demo import construir_estudio_demo
 
 st.html("""
 <div class='avm-hero'>
   <span class='avm-kicker'>Sistema de analítica de datos</span>
-  <h1>Del diseño del estudio a datos listos para analizar</h1>
-  <p>Configura el estudio, genera la plantilla de registro, carga los datos y obtén un conjunto
-  verificado, trazable y reproducible para el motor estadístico.</p>
+  <h1>Del diseño del estudio al informe técnico</h1>
+  <p>Configura el estudio, carga los datos, revisa su limpieza, ejecuta el motor estadístico
+  y emite un informe trazable y comprensible.</p>
 </div>
 """)
 
@@ -56,37 +55,9 @@ with derecha:
             st.rerun()
         st.page_link(PAGINAS["asistente"], label="Abrir el asistente en pantalla completa", icon=":material/open_in_full:")
     with st.container(border=True):
-        st.markdown(":material/school: **Estudio de ejemplo**")
-        st.caption("Crea un estudio sintético para recorrer el flujo. No es un método ni un diseño aprobado.")
-        if st.button("Crear estudio de ejemplo", icon=":material/auto_awesome:", width="stretch"):
-            base = repo.crear_estudio("Estudio de ejemplo (sintético)", usuario())
-            demo = construir_estudio_demo(base.codigo, base.nombre)
-            demo.creado_en = base.creado_en
-            repo.guardar_estudio(demo, usuario(), "estudio de ejemplo")
-            st.session_state["estudio_codigo"] = base.codigo
-            st.toast(f"Estudio {base.codigo} creado", icon=":material/check_circle:")
-            st.rerun()
-    with st.container(border=True):
-        st.markdown(":material/science: **Bases de prueba del motor**")
-        st.caption("Crea los 4 estudios de prueba (normal/no normal × cumple/no cumple) desde `data/estudios_prueba/`: "
-                   "diseño, carga, calidad, conjunto aprobado y análisis v1 listos.")
-        if st.button("Crear los estudios de prueba", icon=":material/dataset_linked:", width="stretch", key="crear_pruebas"):
-            if not usuario():
-                st.warning("Escribe tu nombre en la barra lateral.")
-            else:
-                from src.servicios.estudios_prueba import ErrorImportacion, crear_estudios_prueba
-                try:
-                    with st.spinner("Creando estudios, cargando datos y ejecutando el motor…"):
-                        creados = crear_estudios_prueba(repo, usuario())
-                    nuevos = [x for x in creados if "codigo" in x]
-                    if nuevos:
-                        st.session_state["estudio_codigo"] = nuevos[0]["codigo"]
-                    st.session_state["pruebas_creadas"] = creados
-                    st.rerun()
-                except ErrorImportacion as exc:
-                    st.error(str(exc))
-        for x in st.session_state.get("pruebas_creadas", []):
-            st.caption(f"✓ {x['codigo']} · {x['nombre']}" if "codigo" in x else f"• {x['nombre']}: {x['omitido']}")
+        st.markdown(":material/science: **Estudios de testeo**")
+        st.caption("Testeo 1 a 4 ya están cargados con sus datos (normal/no normal × cumple/no cumple). "
+                   "Elígelos en «Estudio activo» y ve directo a Análisis estadístico.")
+        st.page_link(PAGINAS["analisis"], label="Ir a Análisis estadístico", icon=":material/query_stats:")
 
-st.caption("Dato experimental ≠ resultado de interés ≠ análisis estadístico ≠ criterio de evaluación. "
-           "Esta fase prepara los datos; no ejecuta pruebas estadísticas ni decide conformidad.")
+st.caption("Dato experimental ≠ resultado de interés ≠ análisis estadístico ≠ criterio de evaluación.")
