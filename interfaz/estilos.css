@@ -1,0 +1,40 @@
+/*
+  Estilos propios de la aplicación.
+  Regla de mantenimiento: estas clases SOLO se aplican a bloques HTML que la
+  propia aplicación escribe con st.html (encabezado, banda de pasos, chips).
+  No se usan selectores internos de Streamlit, para que una actualización de
+  Streamlit no rompa la apariencia. El resto del aspecto viene del tema
+  definido en .streamlit/config.toml.
+*/
+
+.avm-hero {
+  background: linear-gradient(120deg, #6D5BD0 0%, #8E7CF0 55%, #B9A9FF 100%);
+  color: #FFFFFF;
+  border-radius: 20px;
+  padding: 28px 32px;
+  margin-bottom: 4px;
+}
+.avm-hero h1 { color: #FFFFFF; font-size: 1.9rem; margin: 0 0 6px 0; line-height: 1.2; }
+.avm-hero p  { color: #F1EEFF; margin: 0; font-size: 1.02rem; max-width: 760px; }
+.avm-hero .avm-kicker {
+  display: inline-block; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase;
+  background: rgba(255,255,255,.18); padding: 4px 10px; border-radius: 999px; margin-bottom: 12px;
+}
+
+.avm-encabezado { margin: 0 0 6px 0; }
+.avm-encabezado .avm-kicker {
+  font-size: .76rem; letter-spacing: .08em; text-transform: uppercase; color: #6D5BD0; font-weight: 600;
+}
+.avm-encabezado h1 { font-size: 1.75rem; margin: 2px 0 4px 0; color: #1E1B4B; }
+.avm-encabezado p  { color: #5B5880; margin: 0; max-width: 820px; }
+
+.avm-pasos { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 2px 0; }
+.avm-paso {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+  font-size: .82rem; border: 1px solid #E2DFF2; background: #FFFFFF; color: #5B5880;
+}
+.avm-paso.hecho  { background: #E7F7F1; border-color: #BFE9DA; color: #0E7A5D; }
+.avm-paso.actual { background: #EFEDF9; border-color: #6D5BD0; color: #4C3BB0; font-weight: 600; }
+
+.avm-leyenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: .82rem; color: #5B5880; }
+.avm-muestra { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
