@@ -29,7 +29,7 @@ paginas = {
         st.Page("interfaz/paginas/diseno.py", title="Diseño experimental", icon=":material/science:"),
         st.Page("interfaz/paginas/plantillas.py", title="Plantillas", icon=":material/table_view:"),
     ],
-    "Próximas fases": [
+    "Análisis e informes": [
         st.Page("interfaz/paginas/analisis.py", title="Análisis estadístico", icon=":material/query_stats:"),
         st.Page("interfaz/paginas/informes.py", title="Informes", icon=":material/description:"),
     ],

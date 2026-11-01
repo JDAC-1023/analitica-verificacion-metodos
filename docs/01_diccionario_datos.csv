@@ -32,6 +32,7 @@ Estudio,Configuración y versión del estudio,fecha_aprobacion,str,"""""",P05,P0
 Estudio,Configuración y versión del estudio,creado_en,str,"""""",,
 Estudio,Configuración y versión del estudio,actualizado_en,str,"""""",,
 Estudio,Configuración y versión del estudio,paso_asistente,int,1,,último paso abierto del asistente de creación (no forma parte del diseño)
+Estudio,Configuración y versión del estudio,derivado_de,str,"""""",,«EST-0001 v2» si se creó con «Clonar estudio» (rediseño)
 Magnitud,Magnitud e intervalo de trabajo,id,str,obligatorio al crear,,"MAG-01, generado"
 Magnitud,Magnitud e intervalo de trabajo,nombre,str,obligatorio al crear,E09,E09
 Magnitud,Magnitud e intervalo de trabajo,unidad,str,obligatorio al crear,E09,E09

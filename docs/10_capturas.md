@@ -24,3 +24,15 @@ Son capturas reales de la aplicación en ejecución (`streamlit run app.py`), to
 | ![Análisis](capturas/08_analisis.png) | **Análisis estadístico.** Sección reservada: explica qué recibirá el motor y qué no hace esta versión, sin simular cálculos. |
 | ![Plantilla Excel](capturas/09_plantilla_excel.png) | **Plantilla Excel (hoja «Mediciones»), diligenciada con errores sembrados.** Gris: columnas del sistema, bloqueadas. Morado oscuro con «*»: datos obligatorios. Morado: columnas del usuario. Se ve el texto «abc» en una celda numérica (M0004) y un valor del patrón vacío (M0010); la carga detecta ambos con su fila y celda. Imagen generada con LibreOffice a partir del archivo real. |
 
+
+## Análisis estadístico e informe (motor v1.0.0)
+
+Capturas tomadas en el navegador con el estudio de ejemplo (datos sintéticos).
+
+| Captura | Qué muestra |
+| --- | --- |
+| ![](capturas/analisis_resultados.png) | Resultados por etapa: conclusión automática, detalle de cada prueba con color según la decisión, comentarios |
+| ![](capturas/analisis_conclusiones.png) | Conclusiones preliminares por etapa y consolidado por característica |
+| ![](capturas/analisis_rediseno.png) | Rediseño: versión derivada con exclusiones motivadas y clonación del estudio |
+| ![](capturas/analisis_informe.png) | Emisión del informe con fecha, elaboró, revisó y autorizó |
+| ![](capturas/informe_pdf_portada-01.png) | Portada del PDF con bloque de control y firmas |

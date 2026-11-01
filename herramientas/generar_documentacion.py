@@ -137,6 +137,11 @@ LIBRERIAS = [
     ("openpyxl", "Generar y leer la plantilla Excel con estilos, validaciones, protección y hojas ocultas", "src/plantillas, src/ingesta", "Permite controlar celda a celda el libro .xlsx sin Excel instalado."),
     ("pyarrow", "Dependencia de Streamlit para mostrar tablas", "(indirecta)", "Requerida por Streamlit."),
     ("pytest", "Pruebas automatizadas", "tests/", "Estándar de pruebas en Python; usado también en GitHub Actions."),
+    ("scipy", "Distribuciones t, F, χ²; Shapiro-Wilk, Anderson-Darling, Wilcoxon, Levene", "src/motor", "Implementaciones de referencia revisadas por pares (Virtanen et al., 2020)."),
+    ("statsmodels", "Prueba de Lilliefors", "src/motor/normalidad.py", "Única dependencia para Lilliefors con tabla de valores p."),
+    ("matplotlib", "Gráficos de diagnóstico (Q-Q, Mandel h/k, puntos por celda) y fuente DejaVu para el PDF", "src/motor/graficos.py, src/informes", "Genera PNG sin servidor gráfico; trae fuentes con símbolos ², σ, χ, ≤."),
+    ("reportlab", "Informe técnico en PDF", "src/informes/pdf.py", "Solicitado por el equipo; control total de tablas, saltos de página y numeración."),
+    ("pypdf", "Leer el PDF generado en las pruebas", "tests/", "Comprueba el contenido real del informe."),
 ]
 
 
@@ -153,8 +158,9 @@ def escribir_librerias() -> None:
              f"> Versiones leídas del entorno real con `importlib.metadata` el {datetime.now():%Y-%m-%d %H:%M} · Python {platform.python_version()} · {platform.system()}.\n\n",
              _md(pd.DataFrame(filas)),
              f"\nBiblioteca estándar de Python usada: {estandar}.\n\n",
-             "No se añadieron dependencias nuevas respecto al entorno existente: `openpyxl` ya estaba instalado, pero faltaba en `requirements.txt` "
-             "(se agregó, junto con su dependencia `et_xmlfile`). El archivo `requirements.txt` se convirtió de UTF-16 a UTF-8.\n"]
+             "Dependencias agregadas para el motor y el informe: scipy, statsmodels, matplotlib, reportlab y pypdf (con sus dependencias "
+             "fijadas en `requirements.txt`). `wrapt` se fija en 2.5.2 porque `formulaic` admite versiones preliminares y pip instalaría una de desarrollo. "
+             "La instalación limpia se comprobó en un entorno nuevo (`pip check` sin conflictos).\n"]
     (DOCS / "08_librerias.md").write_text("".join(texto), encoding="utf-8")
 
 
@@ -193,7 +199,8 @@ def escribir_pruebas() -> int:
     texto = ["# Pruebas realizadas\n\n",
              f"> Generado ejecutando `pytest` el {datetime.now():%Y-%m-%d %H:%M} · Python {platform.python_version()} · "
              f"{platform.system()} · pytest {version('pytest')}. Resultado: {resumen}.\n\n",
-             "Todas las pruebas usan **datos sintéticos** (estudio de ejemplo de 16 mediciones: 2 puntos × 2 técnicos × 2 días × 2 repeticiones). "
+             "Todas las pruebas usan **datos sintéticos** (estudio de ejemplo de 16 mediciones: 2 puntos × 2 técnicos × 2 días × 2 repeticiones) "
+             "y, para el motor, los datos del **anexo B.1 de ISO 5725-2:1994** (azufre en carbón, 8 laboratorios × 4 niveles). "
              "La «entrada» y el «resultado esperado» se toman del docstring de cada prueba; el «resultado obtenido» es el de esta ejecución.\n\n",
              _md(df),
              "\n## Cobertura de los casos solicitados\n\n",
@@ -215,6 +222,17 @@ def escribir_pruebas() -> int:
                  ("Exportación del conjunto preparado", "test_exportacion_del_conjunto_preparado"),
                  ("Reproducibilidad de la salida", "test_reproducibilidad_de_la_salida, test_integridad_detecta_modificacion"),
                  ("Persistencia entre sesiones", "test_persistencia_entre_sesiones"),
+                 ("Motor · tablas ISO 5725-2:1994 frente a fórmula", "test_tablas_transcritas_coinciden_con_formula, test_tabla_mandel_k_y_errata_documentada"),
+                 ("Motor · anexo B.1 de ISO 5725-2", "test_iso_b1_tabla_b5, test_iso_b1_nivel1_desde_estadisticos_redondeados, test_iso_b1_cochran, test_iso_b1_grubbs"),
+                 ("Motor · normal y cumple / no cumple", "test_escenario_normal"),
+                 ("Motor · no normal y cumple / no cumple", "test_escenario_no_normal"),
+                 ("Motor · datos faltantes y celda con n=1, desbalance", "test_faltantes_no_se_imputan_y_celda_n1"),
+                 ("Motor · dependencia (unidades independientes = medias de celda)", "test_escenario_normal"),
+                 ("Motor · sin criterio / p no significativo", "test_sin_criterio_calculado_sin_evaluacion, test_p_no_significativo_no_es_conformidad"),
+                 ("Motor · edición normativa distinta", "test_edicion_normativa_distinta"),
+                 ("Motor · técnicos no son laboratorios", "test_intralaboratorio_no_aplica_cochran_ni_reproducibilidad"),
+                 ("Motor · exclusión con versión derivada", "test_exclusion_documentada_y_recalculo, test_flujo_completo_version2_comentarios_e_informe"),
+                 ("Informe PDF, comentarios, versión 2 y clonación", "test_flujo_completo_version2_comentarios_e_informe, test_clonar_estudio"),
              ], columns=["Caso solicitado", "Prueba(s)"])),
              "\n## Limitaciones de las pruebas\n\n"
              "- Las pruebas de interfaz (`test_interfaz.py`) comprueban que cada página se ejecuta sin errores y que se puede crear un estudio; "

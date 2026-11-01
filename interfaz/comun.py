@@ -27,6 +27,8 @@ PAGINAS = {
     "carga": "interfaz/paginas/carga.py",
     "calidad": "interfaz/paginas/calidad.py",
     "datos": "interfaz/paginas/datos.py",
+    "analisis": "interfaz/paginas/analisis.py",
+    "informes": "interfaz/paginas/informes.py",
 }
 
 ETIQUETA_ESTADO = {
