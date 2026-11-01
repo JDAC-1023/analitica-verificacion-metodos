@@ -1,0 +1,39 @@
+# Tema visual de la aplicación (mantenible: sin selectores internos de Streamlit).
+# Paleta: violeta como acento (coincide con las columnas del usuario en la plantilla Excel),
+# tinta índigo para el texto y fondos claros con un ligero tono lavanda.
+
+[server]
+maxUploadSize = 20
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
+primaryColor = "#6D5BD0"
+backgroundColor = "#F8F7FC"
+secondaryBackgroundColor = "#EFEDF9"
+textColor = "#1E1B4B"
+linkColor = "#5B49C4"
+borderColor = "#E2DFF2"
+showWidgetBorder = true
+baseRadius = "0.7rem"
+buttonRadius = "full"
+font = "'Plus Jakarta Sans', sans-serif:https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+headingFont = "'Plus Jakarta Sans', sans-serif"
+headingFontWeights = [700, 650, 600, 600, 600, 600]
+baseFontSize = 15
+greenColor = "#13A07A"
+orangeColor = "#E08A1E"
+redColor = "#D64561"
+blueColor = "#3B7DDD"
+violetColor = "#6D5BD0"
+dataframeHeaderBackgroundColor = "#F1EFFA"
+
+[theme.sidebar]
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F2FC"
+borderColor = "#ECEAF6"
+
+[client]
+toolbarMode = "minimal"

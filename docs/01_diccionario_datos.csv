@@ -1,0 +1,106 @@
+﻿Entidad,Descripción de la entidad,Campo,Tipo,Valor por defecto,Campo(s) de la matriz,Nota
+Estudio,Configuración y versión del estudio,codigo,str,obligatorio al crear,E02,E02 (automático)
+Estudio,Configuración y versión del estudio,nombre,str,obligatorio al crear,E01,E01
+Estudio,Configuración y versión del estudio,tipo,str,"""Verificación""",E03,E03
+Estudio,Configuración y versión del estudio,metodo,str,"""""",E04,E04
+Estudio,Configuración y versión del estudio,version_metodo,str,"""""",E05,E05
+Estudio,Configuración y versión del estudio,uso_previsto,str,"""""",E06,E06
+Estudio,Configuración y versión del estudio,documento_referencia,str,"""""",E07,E07
+Estudio,Configuración y versión del estudio,responsable,str,"""""",E08,E08
+Estudio,Configuración y versión del estudio,magnitudes,list[Magnitud],field(default_factory=list),"E09, E10","E09, E10"
+Estudio,Configuración y versión del estudio,puntos,list[Punto],field(default_factory=list),E11,E11
+Estudio,Configuración y versión del estudio,tecnicos,list[Recurso],field(default_factory=list),R01,R01
+Estudio,Configuración y versión del estudio,patrones,list[Recurso],field(default_factory=list),"R02, R03","R02, R03"
+Estudio,Configuración y versión del estudio,equipos,list[Recurso],field(default_factory=list),R04,R04
+Estudio,Configuración y versión del estudio,ibcs,list[Recurso],field(default_factory=list),,Equipo a evaluar (IBC); agregado a solicitud del equipo
+Estudio,Configuración y versión del estudio,factores,list[Factor],field(default_factory=list),"D03, D04, D15","D03, D04, D15"
+Estudio,Configuración y versión del estudio,condiciones_controladas,str,"""""",D05,D05
+Estudio,Configuración y versión del estudio,agrupacion,list[str],"field(default_factory=lambda: [""punto""])",D06,D06: claves que forman grupos comparables
+Estudio,Configuración y versión del estudio,repeticiones_por_condicion,int,2,D07,"D07 (valor por defecto del planificador, editable por fila)"
+Estudio,Configuración y versión del estudio,unidad_experimental,str,"""""",D08,D08 (pendiente técnico)
+Estudio,Configuración y versión del estudio,restricciones,list[Restriccion],field(default_factory=list),D11,D11
+Estudio,Configuración y versión del estudio,variables,list[Variable],field(default_factory=list),D12-D14,D12-D14
+Estudio,Configuración y versión del estudio,resultados,list[ResultadoInteres],field(default_factory=list),V01-V10,V01-V10
+Estudio,Configuración y versión del estudio,criterios,list[Criterio],field(default_factory=list),C01-C03,C01-C03
+Estudio,Configuración y versión del estudio,periodo_inicio,str,"""""",P01,P01
+Estudio,Configuración y versión del estudio,periodo_fin,str,"""""",P01,P01
+Estudio,Configuración y versión del estudio,plan,list[MedicionPlanificada],field(default_factory=list),"D09, D10, P02-P04","D09, D10, P02-P04"
+Estudio,Configuración y versión del estudio,version_diseno,int,0,P05,P05 · 0 = nunca aprobado
+Estudio,Configuración y versión del estudio,estado,str,"""borrador""",P05,P05 · borrador | aprobado
+Estudio,Configuración y versión del estudio,aprobado_por,str,"""""",P05,P05
+Estudio,Configuración y versión del estudio,fecha_aprobacion,str,"""""",P05,P05
+Estudio,Configuración y versión del estudio,creado_en,str,"""""",,
+Estudio,Configuración y versión del estudio,actualizado_en,str,"""""",,
+Estudio,Configuración y versión del estudio,paso_asistente,int,1,,último paso abierto del asistente de creación (no forma parte del diseño)
+Magnitud,Magnitud e intervalo de trabajo,id,str,obligatorio al crear,,"MAG-01, generado"
+Magnitud,Magnitud e intervalo de trabajo,nombre,str,obligatorio al crear,E09,E09
+Magnitud,Magnitud e intervalo de trabajo,unidad,str,obligatorio al crear,E09,E09
+Magnitud,Magnitud e intervalo de trabajo,intervalo_min,float | None,None,E10,E10
+Magnitud,Magnitud e intervalo de trabajo,intervalo_max,float | None,None,E10,E10
+Punto,Punto nominal de medición,id,str,obligatorio al crear,,"PT-01, generado"
+Punto,Punto nominal de medición,magnitud_id,str,obligatorio al crear,,
+Punto,Punto nominal de medición,valor_nominal,float,obligatorio al crear,,
+Punto,Punto nominal de medición,unidad,str,obligatorio al crear,,
+Recurso,"Técnico, patrón o equipo",codigo,str,obligatorio al crear,,"T-01, P-01, EQ-01, IBC-01 (lo escribe el usuario)"
+Recurso,"Técnico, patrón o equipo",nombre,str,"""""",,
+Recurso,"Técnico, patrón o equipo",tipo,str,"""tecnico""",,tecnico | patron | equipo | ibc
+Recurso,"Técnico, patrón o equipo",magnitud_id,str,"""""",R03,R03 (patrones e IBC)
+Recurso,"Técnico, patrón o equipo",intervalo_min,float | None,None,R03,R03 intervalo útil del patrón / intervalo del IBC
+Recurso,"Técnico, patrón o equipo",intervalo_max,float | None,None,,
+Recurso,"Técnico, patrón o equipo",descripcion,str,"""""",,
+Recurso,"Técnico, patrón o equipo",marca,str,"""""",,patrón / IBC
+Recurso,"Técnico, patrón o equipo",modelo,str,"""""",,patrón / IBC
+Recurso,"Técnico, patrón o equipo",serie,str,"""""",,patrón / IBC
+Recurso,"Técnico, patrón o equipo",resolucion,str,"""""",,IBC (texto: se registra tal como figura en el equipo)
+Recurso,"Técnico, patrón o equipo",certificado,str,"""""",,patrón: certificado de calibración vigente
+Factor,Condición que se compara o se registra (factor experimental),id,str,obligatorio al crear,,"F-01, generado"
+Factor,Condición que se compara o se registra (factor experimental),nombre,str,obligatorio al crear,D03,D03
+Factor,Condición que se compara o se registra (factor experimental),descripcion,str,"""""",,
+Factor,Condición que se compara o se registra (factor experimental),tipo_valor,str,"""categorico""",D04,D04
+Factor,Condición que se compara o se registra (factor experimental),unidad,str,"""""",,
+Factor,Condición que se compara o se registra (factor experimental),niveles,list[str],field(default_factory=list),D04,D04
+Factor,Condición que se compara o se registra (factor experimental),vinculo_recurso,str,"""ninguno""",,"si el factor es técnico/patrón/equipo, sus niveles vienen del catálogo"
+Factor,Condición que se compara o se registra (factor experimental),rol,str,"""se_compara""",D15,D15: se cambia para comparar o solo se registra
+Restriccion,Combinación no permitida,campo_a,str,obligatorio al crear,,"p. ej. ""patron"" o ""F-02"""
+Restriccion,Combinación no permitida,valor_a,str,obligatorio al crear,,
+Restriccion,Combinación no permitida,campo_b,str,obligatorio al crear,,
+Restriccion,Combinación no permitida,valor_b,str,obligatorio al crear,,
+Restriccion,Combinación no permitida,motivo,str,"""""",,
+Variable,Dato experimental que se registra,id,str,obligatorio al crear,,"V-01, generado (clave técnica estable)"
+Variable,Dato experimental que se registra,nombre,str,obligatorio al crear,,
+Variable,Dato experimental que se registra,tipo_dato,str,"""decimal""",,
+Variable,Dato experimental que se registra,unidad,str,"""""",,
+Variable,Dato experimental que se registra,obligatoria,bool,True,,
+Variable,Dato experimental que se registra,descripcion,str,"""""",,
+Variable,Dato experimental que se registra,categoria,str,"""lectura""",,
+ResultadoInteres,Definición de un resultado de interés (no su valor),id,str,obligatorio al crear,V10,"V10: R-01, generado"
+ResultadoInteres,Definición de un resultado de interés (no su valor),nombre,str,obligatorio al crear,V01,V01
+ResultadoInteres,Definición de un resultado de interés (no su valor),proposito,str,"""exigido_por_el_metodo""",V02,V02
+ResultadoInteres,Definición de un resultado de interés (no su valor),referencia_proposito,str,"""""",V02,V02
+ResultadoInteres,Definición de un resultado de interés (no su valor),unidad,str,"""""",V03,"V03 ("""" = no aplica)"
+ResultadoInteres,Definición de un resultado de interés (no su valor),origen,str,"""calculado""",V04,V04
+ResultadoInteres,Definición de un resultado de interés (no su valor),dependencias,list[str],field(default_factory=list),V05,V05: ids de variables u otros resultados
+ResultadoInteres,Definición de un resultado de interés (no su valor),referencia_calculo,str,"""""",V06,V06: referencia/versión del procedimiento (no fórmula)
+ResultadoInteres,Definición de un resultado de interés (no su valor),ambito,str,"""medicion""",V07,V07
+ResultadoInteres,Definición de un resultado de interés (no su valor),analizar,bool,False,V08,V08
+ResultadoInteres,Definición de un resultado de interés (no su valor),tiene_criterio,bool,False,V09,V09
+Criterio,Criterio de evaluación vinculado a un resultado,id,str,obligatorio al crear,,"C-01, generado"
+Criterio,Criterio de evaluación vinculado a un resultado,resultado_id,str,obligatorio al crear,C01,C01
+Criterio,Criterio de evaluación vinculado a un resultado,descripcion,str,"""""",C01,C01
+Criterio,Criterio de evaluación vinculado a un resultado,fuente,str,"""""",C02,C02
+Criterio,Criterio de evaluación vinculado a un resultado,version_fuente,str,"""""",C02,C02
+Criterio,Criterio de evaluación vinculado a un resultado,operador,str,"""""",C03,C03 (libre; no se impone)
+Criterio,Criterio de evaluación vinculado a un resultado,valor,str,"""""",C03,C03 (texto: no se interpreta en esta fase)
+Criterio,Criterio de evaluación vinculado a un resultado,unidad,str,"""""",C03,C03
+Criterio,Criterio de evaluación vinculado a un resultado,condiciones,str,"""""",C03,C03
+Criterio,Criterio de evaluación vinculado a un resultado,aprobado,bool,False,,se aprueba antes de analizar
+MedicionPlanificada,Medición prevista en el plan aprobado,medicion_id,str,obligatorio al crear,,"M0001, generado"
+MedicionPlanificada,Medición prevista en el plan aprobado,punto_id,str,obligatorio al crear,,
+MedicionPlanificada,Medición prevista en el plan aprobado,repeticion,int,obligatorio al crear,,
+MedicionPlanificada,Medición prevista en el plan aprobado,niveles,"dict[str, str]",field(default_factory=dict),,factor_id -> nivel (solo factores sin vínculo a recurso)
+MedicionPlanificada,Medición prevista en el plan aprobado,tecnico,str,"""""",P02,P02
+MedicionPlanificada,Medición prevista en el plan aprobado,patron,str,"""""",P03,P03
+MedicionPlanificada,Medición prevista en el plan aprobado,equipo,str,"""""",R04,R04
+MedicionPlanificada,Medición prevista en el plan aprobado,fecha_planificada,str,"""""","P04, D16",P04 / D16 (ISO yyyy-mm-dd)
+MedicionPlanificada,Medición prevista en el plan aprobado,franja_planificada,str,"""""",P04,P04
+MedicionPlanificada,Medición prevista en el plan aprobado,orden,int | None,None,D10,D10

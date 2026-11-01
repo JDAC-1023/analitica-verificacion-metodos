@@ -1,0 +1,28 @@
+classDiagram
+    class Estudio {
+      codigo E02
+      nombre E01
+      tipo E03
+      metodo E04 · version_metodo E05
+      uso_previsto E06 · documento_referencia E07
+      responsable E08
+      agrupacion D06 · repeticiones D07
+      unidad_experimental D08
+      version_diseno · estado P05
+    }
+    class Magnitud { id · nombre · unidad · intervalo E09 E10 }
+    class Punto { id · magnitud_id · valor_nominal E11 }
+    class Recurso { codigo · tipo · magnitud_id · intervalo R01-R04 }
+    class Factor { id · nombre · niveles · vinculo_recurso · rol D03 D04 D15 }
+    class Variable { id · nombre · tipo_dato · unidad · obligatoria D12-D14 }
+    class ResultadoInteres { id · origen · dependencias · ambito · analizar V01-V10 }
+    class Criterio { id · resultado_id · fuente · operador · valor C01-C03 }
+    class MedicionPlanificada { medicion_id · punto_id · repeticion · niveles · tecnico · patron · fecha }
+    Estudio "1" *-- "*" Magnitud
+    Estudio "1" *-- "*" Punto
+    Estudio "1" *-- "*" Recurso
+    Estudio "1" *-- "*" Factor
+    Estudio "1" *-- "*" Variable
+    Estudio "1" *-- "*" ResultadoInteres
+    Estudio "1" *-- "*" Criterio
+    Estudio "1" *-- "*" MedicionPlanificada

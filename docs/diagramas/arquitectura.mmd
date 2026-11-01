@@ -1,0 +1,29 @@
+flowchart LR
+    subgraph UI["Interfaz · Streamlit (app.py, interfaz/)"]
+        P1[Inicio] --- P2[Estudios] --- P3[Diseño experimental] --- P4[Plantillas]
+        P5[Carga de datos] --- P6[Calidad de datos] --- P7[Datos preparados]
+        P8[Análisis · reservado] --- P9[Informes · reservado]
+    end
+    subgraph NUCLEO["Núcleo · src/ (sin Streamlit)"]
+        M[modelos<br/>Estudio, Factor, Variable,<br/>ResultadoInteres…]
+        C[configuracion<br/>completitud por etapa]
+        PL[planificacion<br/>plan explícito, generador,<br/>importación, validación]
+        T[plantillas<br/>especificación, generador,<br/>diligenciar]
+        I[ingesta<br/>lector: formato, estudio,<br/>versión, huella, columnas]
+        Q[calidad<br/>reglas RC01–RC20,<br/>evaluador, incidencias]
+        TR[transformaciones<br/>catálogo TR01–TR04]
+        S[servicios<br/>flujo: cargar, preparar, aprobar]
+        X[exportacion<br/>tablas SAL-1.0, ZIP,<br/>lector de salida]
+        A[auditoria<br/>SHA-256, marcas de tiempo]
+        R[(persistencia<br/>Repositorio · local<br/>Supabase: pendiente)]
+    end
+    MOTOR[[Motor estadístico<br/>fase posterior]]
+    UI --> S & C & PL & T
+    S --> I --> Q
+    Q --> TR
+    S --> X
+    S --> R
+    T --> M
+    I --> T
+    X --> MOTOR
+    A -.-> R & T & X
