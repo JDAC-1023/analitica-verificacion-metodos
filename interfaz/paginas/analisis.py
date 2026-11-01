@@ -8,7 +8,10 @@ from datetime import date
 import pandas as pd
 import streamlit as st
 
-from interfaz.comun import PAGINAS, encabezado, repositorio, requerir_estudio, requerir_usuario, tabla, usuario
+from interfaz.comun import (PAGINAS, encabezado, repositorio, requerir_dependencias_motor, requerir_estudio,
+                            requerir_usuario, tabla, usuario)
+
+requerir_dependencias_motor()
 from src.auditoria.huella import sha256_bytes
 from src.motor import graficos
 from src.motor.configuracion import (CARACTERISTICAS, ESTADOS_CARACTERISTICA, OPERADORES, PARAMETROS, PRUEBAS_NORMALIDAD,

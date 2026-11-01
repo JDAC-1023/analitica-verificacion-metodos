@@ -81,3 +81,16 @@ def test_clonar_estudio(repo, estudio_aprobado):
     assert clon.codigo != estudio_aprobado.codigo and clon.estado == "borrador" and clon.version_diseno == 0
     assert clon.derivado_de == f"{estudio_aprobado.codigo} v1" and len(clon.plan) == len(estudio_aprobado.plan)
     assert repo.obtener_estudio(clon.codigo).nombre == "Rediseño"
+
+
+def test_crear_estudios_de_prueba(repo):
+    """Entrada: las 4 plantillas diligenciadas de data/estudios_prueba. Esperado: 4 estudios aprobados, 288 mediciones
+    aceptadas cada uno, conjunto aprobado y análisis v1 de la corrección ejecutado sin criterios; volver a pulsar no duplica."""
+    from src.servicios.estudios_prueba import crear_estudios_prueba
+    creados = crear_estudios_prueba(repo, "ana")
+    assert len(creados) == 4
+    for x in creados:
+        assert x["mediciones"] == 288 and x["conteos"]["aceptados"] == 288 and x["analisis"] == "CALCULADO_SIN_EVALUACION"
+        r = repo.obtener_analisis(x["codigo"], 1)["resultado"]
+        assert r["objeto"]["nombre"] == "Corrección" and len(r["datos"]) == 288
+    assert all("omitido" in x for x in crear_estudios_prueba(repo, "ana"))

@@ -66,6 +66,27 @@ with derecha:
             st.session_state["estudio_codigo"] = base.codigo
             st.toast(f"Estudio {base.codigo} creado", icon=":material/check_circle:")
             st.rerun()
+    with st.container(border=True):
+        st.markdown(":material/science: **Bases de prueba del motor**")
+        st.caption("Crea los 4 estudios de prueba (normal/no normal × cumple/no cumple) desde `data/estudios_prueba/`: "
+                   "diseño, carga, calidad, conjunto aprobado y análisis v1 listos.")
+        if st.button("Crear los estudios de prueba", icon=":material/dataset_linked:", width="stretch", key="crear_pruebas"):
+            if not usuario():
+                st.warning("Escribe tu nombre en la barra lateral.")
+            else:
+                from src.servicios.estudios_prueba import ErrorImportacion, crear_estudios_prueba
+                try:
+                    with st.spinner("Creando estudios, cargando datos y ejecutando el motor…"):
+                        creados = crear_estudios_prueba(repo, usuario())
+                    nuevos = [x for x in creados if "codigo" in x]
+                    if nuevos:
+                        st.session_state["estudio_codigo"] = nuevos[0]["codigo"]
+                    st.session_state["pruebas_creadas"] = creados
+                    st.rerun()
+                except ErrorImportacion as exc:
+                    st.error(str(exc))
+        for x in st.session_state.get("pruebas_creadas", []):
+            st.caption(f"✓ {x['codigo']} · {x['nombre']}" if "codigo" in x else f"• {x['nombre']}: {x['omitido']}")
 
 st.caption("Dato experimental ≠ resultado de interés ≠ análisis estadístico ≠ criterio de evaluación. "
            "Esta fase prepara los datos; no ejecuta pruebas estadísticas ni decide conformidad.")

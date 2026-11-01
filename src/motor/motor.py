@@ -119,14 +119,21 @@ def conclusiones_por_etapa(ctx: Contexto, final: dict) -> dict:
                              "Los procedimientos afectados usan alternativas o lo declaran como limitación. " if rech else
                              "En ningún caso se rechaza H0 de normalidad (esto no demuestra normalidad). "))
     # desempeño
-    partes = []
+    partes, grupos = [], {}
     for x in res:
         if x.etapa != "desempeno" or x.estado != APLICABLE or not x.estimacion:
             continue
-        e = x.estimacion
-        partes.append(f"{x.tecnica} {x.agrupacion}: {e['nombre']}={P.fmt(e['valor'])} {e.get('unidad') or ''}"
-                      + (f", IC {P.ic_txt(x.ic)}" if x.ic and x.ic[0] is not None else "")
-                      + f" → {x.decision_metrologica or '—'}")
+        grupos.setdefault((x.caracteristica, x.estimacion["nombre"]), []).append(x)
+    for (_, nombre), xs in grupos.items():
+        unidad = xs[0].estimacion.get("unidad") or ""
+        vals = [x.estimacion["valor"] for x in xs]
+        decs = {}
+        for x in xs:
+            decs[x.decision_metrologica or "—"] = decs.get(x.decision_metrologica or "—", 0) + 1
+        rutas = sorted({x.tecnica for x in xs})
+        rango = P.fmt(vals[0]) if len(vals) == 1 else f"de {P.fmt(min(vals))} a {P.fmt(max(vals))}"
+        partes.append(f"{nombre} ({', '.join(rutas)}) en {len(xs)} nivel(es): {rango} {unidad} → "
+                      + ", ".join(f"{k}: {v}" for k, v in decs.items()))
     no_ap = [f"{x.tecnica}: {x.motivos[0].rstrip('.')}" for x in res if x.etapa == "desempeno" and x.estado in (NO_APLICABLE, DATOS_INSUFICIENTES) and x.motivos]
     out["desempeno"] = ("; ".join(partes) + ". " if partes else "No hay estimaciones de desempeño. ") + \
         (("No calculado: " + "; ".join(no_ap) + ".") if no_ap else "")

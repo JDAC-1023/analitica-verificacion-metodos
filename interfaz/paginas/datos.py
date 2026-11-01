@@ -53,6 +53,11 @@ if not prep["aprobada"]:
             st.rerun()
         except ErrorFlujo as exc:
             st.error(str(exc))
+else:
+    with b3:
+        if st.button("Siguiente: Análisis estadístico", type="primary", icon=":material/arrow_forward:", width="stretch",
+                     key="ir_analisis"):
+            st.switch_page(PAGINAS["analisis"])
 
 tablas = [("observaciones_analisis", "Vista de análisis"), ("mediciones", "Mediciones"), ("valores", "Datos experimentales"),
           ("resultados_valores", "Resultados registrados"), ("niveles_factores", "Condiciones"), ("registros_estado", "Estado de registros"),

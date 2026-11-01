@@ -1,5 +1,7 @@
 # Cómo incorporar esta entrega (Windows · PowerShell)
 
+> **Actualización 3.1:** botón «Siguiente: Análisis estadístico» en Datos preparados, aviso claro si faltan librerías y los 4 estudios de prueba (`data/estudios_prueba/`) que se crean con un clic en **Inicio → Crear los estudios de prueba**.
+
 Entrega 3: **motor estadístico, conclusiones, comentarios, versión 2 e informe PDF.** El ZIP trae el proyecto completo (sin `datos_locales/` ni `.venv/`). Se descomprime encima de tu carpeta en la rama `prototipo-alejandra`.
 
 ## 1. Qué cambia
@@ -21,7 +23,7 @@ Expand-Archive -Path "$HOME\Downloads\entrega_v3_motor_informe.zip" -Destination
 
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt           # instala las 5 librerías nuevas
-python -m pytest -q                                 # deben pasar 119 pruebas
+python -m pytest -q                                 # deben pasar 120 pruebas
 streamlit run app.py
 ```
 
