@@ -163,6 +163,24 @@ def conclusiones_por_etapa(ctx: Contexto, final: dict) -> dict:
         out["normalidad"] = (f"Se evaluaron {n} objeto(s). " + (f"Se rechaza H0 de normalidad en: {'; '.join(rech)}. "
                              "Los procedimientos afectados usan alternativas o lo declaran como limitación. " if rech else
                              "En ningún caso se rechaza H0 de normalidad (esto no demuestra normalidad). "))
+    # homocedasticidad (solo decide donde hubo normalidad)
+    r, n = _cuenta(res, "homocedasticidad")
+    bart = [x for x in r if x.estado == APLICABLE and "informativa" not in x.tecnica]
+    info = [x for x in r if x.estado == APLICABLE and "informativa" in x.tecnica]
+    pt = lambda xs: ", ".join(x.agrupacion.replace("nivel ", "").split(" · ")[0] for x in xs)  # noqa: E731
+    if n == 0:
+        out["homocedasticidad"] = "No se evaluó la igualdad de varianzas: " + "; ".join(sorted({m.rstrip(".") for x in r for m in x.motivos})[:2]) + "."
+    else:
+        het = [x for x in bart if x.decision_inferencial == "Se rechaza H0"]
+        homo = [x for x in bart if x.decision_inferencial != "Se rechaza H0"]
+        partes = []
+        if homo:
+            partes.append(f"Datos normales y varianzas iguales (Bartlett) en {pt(homo)} → ANOVA clásico + Tukey.")
+        if het:
+            partes.append(f"Datos normales pero varianzas distintas (Bartlett) en {pt(het)} → ANOVA de Welch + Games-Howell.")
+        if info:
+            partes.append(f"Datos no normales en {pt(info)} → no se aplica ANOVA; Kruskal-Wallis + Dunn (Fligner-Killeen solo informa).")
+        out["homocedasticidad"] = " ".join(partes)
     # desempeño
     partes, grupos = [], {}
     for x in res:

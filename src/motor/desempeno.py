@@ -229,7 +229,10 @@ def _repetibilidad(ctx: Contexto) -> None:
             lim.append(f"{int((c['n'] < 2).sum())} celda(s) con un solo resultado no aportan grados de libertad.")
         normal = ctx.normalidad.get(("precision", punto_id))
         if normal != "no_rechaza":
-            lim.append("El IC χ² supone residuos normales; " + ("se rechazó la normalidad." if normal == "rechaza" else "la normalidad no fue evaluable."))
+            ic = [None, None]
+            lim.append("No se informa intervalo de confianza: el IC basado en χ² exige residuos normales y "
+                       + ("se rechazó la normalidad." if normal == "rechaza" else "la normalidad no fue evaluable.")
+                       + " La estimación puntual (varianzas agrupadas) no depende de ese supuesto.")
         condiciones = "repetibilidad dentro de " + (f"cada combinación de {', '.join(nombre_campo(ctx.e, f) for f in cfg.factores_precision_intermedia)}"
                                                      if cfg.factores_precision_intermedia else "cada laboratorio" if cfg.es_interlaboratorio else "el nivel")
         ctx.nuevo(ETAPA, "Repetibilidad (s_r)", agr, APLICABLE, caracteristica="repetibilidad", punto_id=punto_id,
@@ -263,47 +266,51 @@ def _precision_intermedia(ctx: Contexto) -> None:
             continue
         a = anova_un_factor(c)
         sI = math.sqrt(a["s_I2"])
-        ic = ic_desviacion(a["s_I2"], a["gl_sI"], cfg.nivel_confianza)
+        normal = ctx.normalidad.get(("precision", punto_id))
+        homo = ctx.homocedasticidad.get(punto_id)
+        con_prueba = normal == "no_rechaza" and homo != "rechaza"
+        ic = ic_desviacion(a["s_I2"], a["gl_sI"], cfg.nivel_confianza) if normal == "no_rechaza" else [None, None]
         lim = []
         if len(cfg.factores_precision_intermedia) > 1:
-            lim.append(f"Los factores ({nombres}) se combinaron en un único factor de agrupación; no se separan componentes por factor.")
+            lim.append(f"Los factores ({nombres}) se combinaron en un único factor de agrupación para estimar s_I; su efecto por separado "
+                       "se evalúa en «Fuentes de variación».")
         if a["s_b2_bruto"] < 0:
             lim.append("La varianza entre grupos estimada fue negativa y se tomó como 0 (RM-15).")
         if c["n"].nunique() > 1:
             lim.append(f"Diseño desbalanceado (n por grupo: {c['n'].tolist()}); se usó n0 = {P.fmt(a['n0'])}.")
         if len(c) < 4:
             lim.append(f"Solo {len(c)} grupos: la varianza entre grupos se estima con pocos grados de libertad.")
-        lev = None
-        if (c["n"] < 3).any():
-            lim.append("Homogeneidad de varianzas (Levene) no evaluada: requiere al menos 3 resultados por grupo.")
-        elif len(c) >= 2:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                grupos = [cg["valor"].to_numpy(float) for _, cg in g.groupby("celda")]
-                try:
-                    r = stats.levene(*grupos, center="median")
-                    lev = {"estadistico": float(r.statistic), "p": float(r.pvalue)}
-                except ValueError:
-                    lev = None
-        if lev and not math.isnan(lev["p"]):
-            lim.append(f"Levene (mediana): W={P.fmt(lev['estadistico'])}, p={P.fmt_p(lev['p'])} → "
-                       + ("se rechaza la homogeneidad de varianzas." if lev["p"] < cfg.alfa else "no se rechaza la homogeneidad de varianzas."))
-        ctx.nuevo(ETAPA, "Reproducibilidad intralaboratorio (s_I, ANOVA)", agr, APLICABLE, caracteristica="precision_intermedia",
+        if normal != "no_rechaza":
+            lim.append("Datos no normales: s_I se informa como estimación por componentes de varianza (momentos), sin prueba F ni "
+                       "intervalo χ², porque ambos exigen normalidad.")
+        elif homo == "rechaza":
+            lim.append("Varianzas distintas entre grupos: no se informa la prueba F clásica; la influencia de las condiciones se evalúa "
+                       "con ANOVA de Welch en «Fuentes de variación».")
+        if con_prueba:
+            dec = ("Se rechaza H0: las condiciones aportan variación" if a["p_F"] is not None and a["p_F"] < cfg.alfa
+                   else "No se rechaza H0 (no demuestra ausencia de efecto)")
+        else:
+            dec = "Sin prueba F (supuestos no cumplidos); ver «Fuentes de variación»"
+        ctx.nuevo(ETAPA, "Reproducibilidad intralaboratorio (s_I)", agr, APLICABLE, caracteristica="precision_intermedia",
                   punto_id=punto_id, n=len(g), incluidas=list(g["medicion_id"]), origen_regla=COMPLEMENTARIA,
-                  referencia="Eurachem (2016) §6.6.4 y anexo C; Satterthwaite (1946)",
-                  formula="s_b² = máx(0, (MSB − MSW)/n0); s_I² = MSW + s_b²", gl=a["gl_sI"], ic=ic,
-                  estadistico={"simbolo": "F", "valor": a["F"]}, p_valor=a["p_F"],
-                  hipotesis={"H0": "σ²_entre = 0", "H1": "σ²_entre > 0", "lateralidad": "unilateral", "alfa": cfg.alfa},
+                  referencia="ISO 5725-3:1994; Eurachem (2016) §6.6.4 y anexo C; Satterthwaite (1946)",
+                  algoritmo="Componentes de varianza (cuadrados medios de un factor)",
+                  formula="s_b² = máx(0, (CM_entre − CM_dentro)/n0); s_I² = CM_dentro + s_b²",
+                  gl=a["gl_sI"] if normal == "no_rechaza" else None, ic=ic,
+                  estadistico={"simbolo": "F", "valor": a["F"]} if con_prueba else {}, p_valor=a["p_F"] if con_prueba else None,
+                  hipotesis={"H0": "σ²_entre = 0", "H1": "σ²_entre > 0", "lateralidad": "unilateral", "alfa": cfg.alfa} if con_prueba else {},
+                  supuestos=[{"supuesto": "Normalidad de residuos", "verificado": normal == "no_rechaza", "evidencia": "Etapa de normalidad"},
+                             {"supuesto": "Varianzas similares", "verificado": homo == "no_rechaza", "evidencia": "Etapa de homocedasticidad"}],
                   estimacion={"nombre": "s_I", "valor": sI, "unidad": ctx.obs.unidad, "s_r": math.sqrt(a["s_r2"]),
-                              "s_entre": math.sqrt(a["s_b2"]), "anova": a, "levene": lev},
-                  decision_inferencial=("Se rechaza H0: hay variación entre grupos" if a["p_F"] is not None and a["p_F"] < cfg.alfa
-                                        else "No se rechaza H0 (no demuestra ausencia de efecto)") if a["p_F"] is not None else "—",
+                              "s_entre": math.sqrt(a["s_b2"]), "anova": a, "con_prueba_F": con_prueba},
+                  decision_inferencial=dec,
                   tabla=[{"grupo": r.celda, "n": int(r.n), "media": r.media, "s": r.s} for r in c.itertuples()],
                   limitaciones=lim, graficos=[f"puntos:{punto_id}"],
                   texto=P.render(P.PRECISION, tipo_precision="la reproducibilidad intralaboratorio (precisión intermedia)", variable=ctx.obs.nombre_objeto, nivel=punto,
                                  n=len(g), condiciones=f"cambiando {nombres}", estimacion=f"s_I={P.fmt(sI)}", unidad=ctx.obs.unidad,
-                                 ic=P.ic_txt(ic, ctx.obs.unidad), gl=P.fmt(a["gl_sI"], 3),
-                                 procedimiento="ANOVA de un factor de efectos aleatorios", criterio="{criterio}", decision="{estado}"))
+                                 ic=P.ic_txt(ic, ctx.obs.unidad), gl=P.fmt(a["gl_sI"], 3) if normal == "no_rechaza" else "no aplica",
+                                 procedimiento="componentes de varianza" + (" con prueba F" if con_prueba else " (sin prueba F: supuestos no cumplidos)"),
+                                 criterio="{criterio}", decision="{estado}"))
 
 
 def _reproducibilidad(ctx: Contexto) -> None:

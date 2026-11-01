@@ -362,14 +362,14 @@ def _frase_grupo(tecnica: str, xs: list[dict]) -> str:
     txt = ""
     if e:
         txt = f"Valores entre **{fmt(min(e))}** y **{fmt(max(e))} {xs[0]['unidad']}** en {len(xs)} punto(s). "
-    txt += "Resultado: " + "; ".join(f"{k.lower()} en {v}" for k, v in significados.items()) + "."
+    txt += "Resultado: " + "; ".join(f"{k[:1].lower() + k[1:]} en {v}" for k, v in significados.items()) + "."
     decs = {}
     for x in xs:
         d = explicar(x)["decision"]
         if d:
             decs[d] = decs.get(d, 0) + 1
     if decs:
-        txt += " Frente al criterio: " + "; ".join(f"{k.lower()} en {v}" for k, v in decs.items()) + "."
+        txt += " Frente al criterio: " + "; ".join(f"{k[:1].lower() + k[1:]} en {v}" for k, v in decs.items()) + "."
         if "Sin criterio" in decs:
             txt += " *(«Sin criterio»: falta definir el límite de aceptación para decir si cumple.)*"
     return txt

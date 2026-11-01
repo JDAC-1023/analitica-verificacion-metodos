@@ -93,29 +93,39 @@ def pasos(resultado: dict) -> list[dict]:
         if not rech:
             salida.append({"paso": "¿Los datos son normales?", "estado": OK,
                            "texto": f"SÍ. En las {len(norm)} revisiones (Shapiro-Wilk, α = 0,05) no se rechaza la normalidad.",
-                           "siguiente": "Se usan pruebas paramétricas (t de Student, ANOVA). Se pasa a revisar la homocedasticidad."})
+                           "siguiente": "Se puede seguir por la vía paramétrica: sesgo con t de Student y, antes de cualquier ANOVA, "
+                                        "revisar la igualdad de varianzas (Bartlett)."})
         else:
             donde = _lista(sorted({_p(r) + (" (promedios)" if "sesgo" in r["agrupacion"] else " (lecturas)") for r in rech}))
             salida.append({"paso": "¿Los datos son normales?", "estado": ALERTA,
                            "texto": f"NO en {len(rech)} de {len(norm)} revisiones: {donde}. En el resto sí.",
-                           "siguiente": "Donde no son normales se usan pruebas no paramétricas (Wilcoxon, Kruskal-Wallis); donde sí, las "
-                                        "paramétricas. Se pasa a revisar la homocedasticidad."})
+                           "siguiente": "Donde no son normales NO se aplica ANOVA: se usan Wilcoxon (sesgo) y Kruskal-Wallis (técnicos y "
+                                        "patrones), y no se calculan intervalos χ². Donde sí son normales se revisa la igualdad de varianzas."})
 
-    # 4 · homocedasticidad
+    # 4 · homocedasticidad (solo decide donde hubo normalidad)
     homo = _res(resultado, etapa="homocedasticidad")
     if homo:
-        het = [r for r in homo if r["decision_inferencial"] == "Se rechaza H0"]
-        pruebas = sorted({r["tecnica"][len("Homocedasticidad ("):-1] for r in homo})
-        if not het:
-            salida.append({"paso": "¿Las varianzas son iguales (homocedasticidad)?", "estado": OK,
-                           "texto": f"SÍ. Con {', '.join(pruebas)} las series tienen dispersiones similares en los {len(homo)} puntos.",
-                           "siguiente": "Se puede comparar técnicos y patrones con ANOVA clásico (o Kruskal-Wallis donde no hubo normalidad)."})
-        else:
-            det = "; ".join(f"{_p(r)}: la serie {r['estimacion']['serie_max']} es la más dispersa (s = {fmt(r['estimacion']['s_max'])} {u})"
-                            for r in het[:4])
-            salida.append({"paso": "¿Las varianzas son iguales (homocedasticidad)?", "estado": ALERTA,
-                           "texto": f"NO en {len(het)} de {len(homo)} puntos. {det}.",
-                           "siguiente": "Allí se compara con ANOVA de Welch (no exige varianzas iguales) o Kruskal-Wallis."})
+        bart = [r for r in homo if "informativa" not in r["tecnica"]]
+        info = [r for r in homo if "informativa" in r["tecnica"]]
+        het = [r for r in bart if r["decision_inferencial"] == "Se rechaza H0"]
+        partes = []
+        if bart:
+            partes.append(f"Donde los datos son normales ({_lista(_p(r) for r in bart)}) se aplicó Bartlett: "
+                          + ("varianzas iguales en todos." if not het else
+                             f"varianzas distintas en {_lista(_p(r) for r in het)} (la serie más dispersa: "
+                             + "; ".join(f"{_p(r)} {r['estimacion']['serie_max']}" for r in het[:3]) + ")."))
+        if info:
+            partes.append(f"Donde no son normales ({_lista(_p(r) for r in info)}) no se evalúa para decidir: no se usará ANOVA.")
+        sig = []
+        ok_pts = [r for r in bart if r["decision_inferencial"] != "Se rechaza H0"]
+        if ok_pts:
+            sig.append(f"{_lista(_p(r) for r in ok_pts)} → ANOVA clásico + Tukey")
+        if het:
+            sig.append(f"{_lista(_p(r) for r in het)} → ANOVA de Welch + Games-Howell")
+        if info:
+            sig.append(f"{_lista(_p(r) for r in info)} → Kruskal-Wallis + Dunn")
+        salida.append({"paso": "¿Las varianzas son iguales (homocedasticidad)?", "estado": ALERTA if het else OK,
+                       "texto": " ".join(partes), "siguiente": "Por lo tanto: " + "; ".join(sig) + "."})
 
     # 5 · comparación de condiciones
     fv = _res(resultado, car="fuentes_variacion")

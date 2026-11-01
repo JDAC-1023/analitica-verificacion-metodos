@@ -35,6 +35,7 @@ REFERENCIAS = {
     "games_howell": "Games, P. A., & Howell, J. F. (1976). Pairwise multiple comparison procedures with unequal n's and/or variances: A Monte Carlo study. *Journal of Educational Statistics, 1*(2), 113–125. https://doi.org/10.3102/10769986001002113",
     "tukey": "Tukey, J. W. (1949). Comparing individual means in the analysis of variance. *Biometrics, 5*(2), 99–114. https://doi.org/10.2307/3001913",
     "holm": "Holm, S. (1979). A simple sequentially rejective multiple test procedure. *Scandinavian Journal of Statistics, 6*(2), 65–70.",
+    "conover": "Conover, W. J., Johnson, M. E., & Johnson, M. M. (1981). A comparative study of tests for homogeneity of variances, with applications to the outer continental shelf bidding data. *Technometrics, 23*(4), 351–361. https://doi.org/10.1080/00401706.1981.10487680",
     "montgomery": "Montgomery, D. C. (2017). *Design and analysis of experiments* (9.ª ed.). John Wiley & Sons.",
     "scipy": "Virtanen, P., Gommers, R., Oliphant, T. E., et al. (2020). SciPy 1.0: Fundamental algorithms for scientific computing in Python. *Nature Methods, 17*, 261–272. https://doi.org/10.1038/s41592-019-0686-2",
     "statsmodels": "Seabold, S., & Perktold, J. (2010). Statsmodels: Econometric and statistical modeling with Python. En *Proceedings of the 9th Python in Science Conference* (pp. 92–96). https://doi.org/10.25080/Majora-92bf1922-011",
@@ -119,7 +120,9 @@ FUNDAMENTOS = {
         "texto": ("Con un diseño de grupos (días, técnicos u otras condiciones cambiantes dentro del laboratorio) analizado mediante ANOVA "
                   "de un factor de efectos aleatorios, la repetibilidad es la precisión dentro del grupo y la precisión intermedia es la raíz de "
                   "la suma de las varianzas dentro y entre grupos (Eurachem, 2016, §6.6.4 y anexo C). Si la estimación de la varianza entre "
-                  "grupos resulta negativa se toma como cero. Los grados de libertad de s_I se aproximan por Satterthwaite. "
+                  "grupos resulta negativa se toma como cero. La estimación puntual por componentes de varianza (momentos) no exige normalidad; "
+                  "la prueba F del efecto entre grupos y el intervalo χ² (gl de Satterthwaite) sí, por lo que solo se informan con residuos "
+                  "normales (y la prueba F, además, con varianzas iguales). "
                   "Mide la reproducibilidad dentro del laboratorio (ISO 5725-3 la llama precisión intermedia); la reproducibilidad entre "
                   "laboratorios de ISO 5725-2 es otra magnitud y exige un estudio interlaboratorio."),
         "refs": ["eurachem", "montgomery", "satterthwaite"],
@@ -131,29 +134,34 @@ FUNDAMENTOS = {
         "refs": ["iso5725_2"],
     },
     "homocedasticidad": {
-        "titulo": "Igualdad de varianzas (homocedasticidad): Bartlett o Levene",
-        "texto": ("Antes de comparar técnicos y patrones se comprueba si las series tienen dispersiones parecidas. Si los residuos son normales "
-                  "se usa la prueba de Bartlett, más potente en ese caso; si no lo son, la de Levene centrada en la mediana (Brown-Forsythe), "
-                  "que no depende de la normalidad. H0: todas las varianzas son iguales. El resultado decide la prueba siguiente: con varianzas "
-                  "iguales, ANOVA clásico; con varianzas distintas, ANOVA de Welch."),
-        "refs": ["bartlett", "levene", "brown_forsythe", "montgomery"],
+        "titulo": "Igualdad de varianzas (homocedasticidad): Bartlett, solo con normalidad",
+        "texto": ("El ANOVA exige dos supuestos en este orden: residuos normales y varianzas iguales entre grupos (Montgomery, 2017, §3.4). "
+                  "Por eso la homocedasticidad solo se evalúa para decidir cuando los residuos son normales, con la prueba de Bartlett "
+                  "(H0: todas las varianzas son iguales), que es la de mayor potencia bajo normalidad. Si no se rechaza H0 se usa el ANOVA "
+                  "clásico; si se rechaza, el ANOVA de Welch, que no exige varianzas iguales. Si los residuos no son normales no se aplica "
+                  "ningún ANOVA: se usa directamente Kruskal-Wallis, y la dispersión se describe con Fligner-Killeen (no paramétrica) "
+                  "solo para interpretar si las diferencias son de posición o de forma."),
+        "refs": ["bartlett", "conover", "montgomery"],
     },
     "posthoc": {
         "titulo": "Dónde están las diferencias: pruebas post hoc",
         "texto": ("Cuando un factor influye, se compara cada par de niveles para saber exactamente cuáles difieren, controlando el error por "
                   "comparaciones múltiples. La prueba depende de la ruta: Tukey HSD tras un ANOVA clásico (normalidad y varianzas iguales); "
-                  "Games-Howell tras un ANOVA de Welch (varianzas distintas); Dunn con ajuste de Holm tras Kruskal-Wallis (datos no normales)."),
+                  "Games-Howell tras un ANOVA de Welch (normalidad con varianzas distintas); Dunn con ajuste de Holm tras Kruskal-Wallis "
+                  "(datos no normales, sin ANOVA)."),
         "refs": ["tukey", "welch", "games_howell", "kruskal", "dunn", "holm"],
     },
     "fuentes_variacion": {
         "titulo": "Fuentes de variación: ANOVA factorial (técnico × patrón)",
-        "texto": ("Para saber si el resultado depende de quién mide, de con qué patrón se mide o de la combinación de ambos, se ajusta en "
-                  "cada punto un modelo de análisis de varianza de efectos fijos con los factores declarados y su interacción "
+        "texto": ("Para saber si el resultado depende de quién mide, de con qué patrón se mide o de la combinación de ambos, y SOLO si los "
+                  "residuos son normales y las varianzas iguales, se ajusta en cada punto un modelo de análisis de varianza de efectos fijos "
+                  "con los factores declarados y su interacción "
                   "(y = μ + αᵢ + βⱼ + (αβ)ᵢⱼ + ε). Cada estadístico F compara la variación atribuible a la fuente con la variación entre réplicas; "
                   "un valor p < α indica que la fuente cambia el resultado medio. La interacción solo es estimable si hay réplicas en cada "
                   "combinación. La contribución porcentual (SC de la fuente / SC total) muestra cuánta de la variación total explica cada fuente. "
-                  "Supone residuos normales e independientes y varianzas similares entre combinaciones."),
-        "refs": ["montgomery", "eurachem", "statsmodels"],
+                  "Con normalidad pero varianzas distintas se usa el ANOVA de Welch por factor; sin normalidad, la prueba de Kruskal-Wallis "
+                  "por factor (rangos), con ε² = H/(N − 1) como tamaño del efecto."),
+        "refs": ["montgomery", "welch", "kruskal", "eurachem", "statsmodels"],
     },
     "levene": {
         "titulo": "Homogeneidad de varianzas (Levene, centrado en la mediana)",
@@ -179,5 +187,5 @@ CITAS = {
     "cochran": "Cochran, 1941", "mandel": "Mandel, 1964", "student": "Student, 1908", "wilcoxon": "Wilcoxon, 1945",
     "levene": "Levene, 1960", "brown_forsythe": "Brown & Forsythe, 1974", "satterthwaite": "Satterthwaite, 1946",
     "montgomery": "Montgomery, 2017", "bartlett": "Bartlett, 1937", "welch": "Welch, 1951", "kruskal": "Kruskal & Wallis, 1952",
-    "dunn": "Dunn, 1964", "games_howell": "Games & Howell, 1976", "tukey": "Tukey, 1949", "holm": "Holm, 1979", "scipy": "Virtanen et al., 2020", "statsmodels": "Seabold & Perktold, 2010",
+    "dunn": "Dunn, 1964", "games_howell": "Games & Howell, 1976", "tukey": "Tukey, 1949", "holm": "Holm, 1979", "conover": "Conover et al., 1981", "scipy": "Virtanen et al., 2020", "statsmodels": "Seabold & Perktold, 2010",
 }

@@ -4,7 +4,9 @@ Responde, por punto: ¿la variabilidad depende significativamente del técnico,
 del patrón o de su combinación? La decisión es inferencial y automática (valor p
 frente a α); no es un criterio de aceptación del método.
 
-Modelo (efectos fijos, sumas de cuadrados tipo II, statsmodels):
+Secuencia (RM-26): normal + varianzas iguales → ANOVA factorial + Tukey; normal + varianzas distintas → Welch + Games-Howell;
+no normal → Kruskal-Wallis + Dunn (NUNCA ANOVA sin normalidad).
+Modelo de la ruta clásica (efectos fijos, sumas de cuadrados tipo II, statsmodels):
     y ~ C(A) + C(B) [+ C(C)] + interacciones de dos factores
 Las interacciones solo se incluyen si cada combinación tiene ≥ 2 réplicas
 (si no, el término no es estimable sin confundirse con el error).
@@ -203,26 +205,30 @@ def ejecutar(ctx: Contexto) -> None:
             ruta, nombre_ruta = "kruskal", "Kruskal-Wallis por factor + Dunn (ajuste de Holm)"
             motivo_ruta = "los residuos no son normales"
         ctx.decidir(f"Fuentes {agr}: ¿qué prueba compara técnicos y patrones?", nombre_ruta, f"Porque {motivo_ruta}.", "RM-26")
-        a = anova_factorial(g, activos, cfg.alfa)              # siempre: contribución porcentual (descriptiva)
         filas = []
-        for f in a["filas"]:
-            if f["tipo"] == "residual":
-                filas.append({**f, "prueba": "—"})
-                continue
-            if ruta == "anova" or f["tipo"] == "interacción":
-                if ruta != "anova":
-                    continue                                  # interacción no evaluable fuera de la ruta clásica
-                filas.append({**f, "prueba": "ANOVA (F)"})
-                continue
-            col = next(c for c, n in activos.items() if n == f["fuente"])
-            grupos = [cg["valor"].to_numpy(float) for _, cg in g.groupby(col)]
-            if ruta == "welch":
-                est, gl1, gl2, p = _welch(grupos)
-                filas.append({**f, "prueba": "Welch (F)", "F": est, "gl": f"{gl1:.0f}; {gl2:.1f}", "p": p, "influye": p < cfg.alfa})
-            else:
-                h = stats.kruskal(*grupos)
-                filas.append({**f, "prueba": "Kruskal-Wallis (H)", "F": float(h.statistic), "p": float(h.pvalue),
-                              "influye": float(h.pvalue) < cfg.alfa})
+        if ruta in ("anova", "welch"):
+            a = anova_factorial(g, activos, cfg.alfa)          # solo con normalidad (supuesto del modelo lineal)
+            r2, formula = a["r2"], a["formula"]
+            for f in a["filas"]:
+                if f["tipo"] == "residual":
+                    filas.append({**f, "prueba": "—"})
+                elif ruta == "anova":
+                    filas.append({**f, "prueba": "ANOVA (F)"})
+                elif f["tipo"] == "factor":                     # Welch: cada factor por separado; la interacción no se prueba
+                    col = next(c for c, n in activos.items() if n == f["fuente"])
+                    est, gl1, gl2, p = _welch([cg["valor"].to_numpy(float) for _, cg in g.groupby(col)])
+                    filas.append({**f, "prueba": "Welch (F)", "F": est, "gl": f"{gl1:.0f}; {gl2:.1f}", "p": p, "influye": p < cfg.alfa})
+            omitidas = a["omitidas"]
+        else:                                                  # sin normalidad: ningún ANOVA
+            r2, formula, omitidas = None, "Kruskal-Wallis por factor: H = 12/(N(N+1)) Σ R_i²/n_i − 3(N+1)", []
+            n_tot = len(g)
+            for col, nombre in activos.items():
+                h = stats.kruskal(*[cg["valor"].to_numpy(float) for _, cg in g.groupby(col)])
+                k = g[col].nunique()
+                eps2 = float(h.statistic) / (n_tot - 1) if n_tot > 1 else None
+                filas.append({"fuente": nombre, "tipo": "factor", "prueba": "Kruskal-Wallis (H)", "gl": k - 1, "SC": None, "CM": None,
+                              "F": float(h.statistic), "p": float(h.pvalue), "eta2_parcial": None, "contribucion_pct": None,
+                              "epsilon2": eps2, "influye": float(h.pvalue) < cfg.alfa})
         posthoc = []
         for f in filas:
             if not f.get("influye") or f["tipo"] != "factor":
@@ -238,12 +244,15 @@ def ejecutar(ctx: Contexto) -> None:
         donde = [x for x in posthoc if x["significativa"]]
         ctxt = contexto_por_factor(g, activos)
         lim = []
-        if a["omitidas"] and ruta == "anova":
-            lim.append(f"Interacción no estimable (faltan réplicas en alguna combinación): {', '.join(a['omitidas'])}.")
+        if omitidas and ruta == "anova":
+            lim.append(f"Interacción no estimable (faltan réplicas en alguna combinación): {', '.join(omitidas)}.")
         if ruta != "anova" and len(activos) > 1:
             lim.append("Con esta ruta cada factor se compara por separado; la interacción no se prueba (se revisa en el gráfico de combinaciones).")
-        if g.groupby(list(activos)).size().nunique() > 1:
+        if g.groupby(list(activos)).size().nunique() > 1 and ruta != "kruskal":
             lim.append("Diseño desbalanceado: la contribución porcentual usa sumas de cuadrados tipo II.")
+        if ruta == "kruskal":
+            lim.append("Sin normalidad no se aplica ANOVA: no hay descomposición en porcentajes de variación; el tamaño del efecto se "
+                       "informa con ε² = H/(N − 1).")
         u = ctx.obs.unidad
         texto = (f"En el {agr} se compararon {', '.join(activos.values())} con {nombre_ruta}, porque {motivo_ruta}. "
                  + (f"Hay diferencias significativas por: {', '.join(influyen)}. " if influyen else
@@ -251,12 +260,12 @@ def ejecutar(ctx: Contexto) -> None:
                  + (" ".join(f"{x['factor']}: {x['comparacion']} difieren en {P.fmt(x['diferencia'])} {u} (p = {P.fmt_p(x['p'])})."
                              for x in donde[:6]))
                  + (" Origen probable: " + "; ".join(f"{fu} → {causa(fu)}" for fu in influyen) + "." if influyen else ""))
-        ctx.nuevo(ETAPA, TECNICA, agr, APLICABLE, caracteristica="fuentes_variacion", punto_id=punto_id, n=a["n"],
+        ctx.nuevo(ETAPA, TECNICA, agr, APLICABLE, caracteristica="fuentes_variacion", punto_id=punto_id, n=int(len(g)),
                   incluidas=list(g["medicion_id"]), origen_regla=COMPLEMENTARIA,
                   referencia="Montgomery (2017) cap. 3 y 5; Welch (1951); Kruskal & Wallis (1952); Dunn (1964); Games & Howell (1976)",
-                  algoritmo=nombre_ruta, formula=a["formula"] if ruta == "anova" else "comparación de cada factor por separado",
+                  algoritmo=nombre_ruta, formula=formula if ruta != "welch" else "ANOVA de Welch para cada factor por separado",
                   hipotesis={"H0": "la fuente no cambia el resultado", "H1": "la fuente cambia el resultado", "alfa": cfg.alfa},
-                  estimacion={"nombre": "fuentes", "valor": None, "unidad": u, "anova": filas, "r2": a["r2"], "contexto": ctxt,
+                  estimacion={"nombre": "fuentes", "valor": None, "unidad": u, "anova": filas, "r2": r2, "contexto": ctxt,
                               "influyen": influyen, "ruta": ruta, "ruta_nombre": nombre_ruta, "motivo_ruta": motivo_ruta,
                               "posthoc": posthoc, "donde": donde, "causas": {fu: causa(fu) for fu in influyen}},
                   tabla=filas, graficos=[f"interaccion:{punto_id}"],

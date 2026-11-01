@@ -4,26 +4,42 @@
 
 ```mermaid
 flowchart TD
-  A[Conjunto preparado APROBADO] --> B[1 · Datos: faltantes y réplicas por serie frente al plan]
-  B --> C{2 · ¿Hay datos atípicos? Grubbs por serie n ≥ 3}
+  A["Conjunto preparado y APROBADO"] --> B["1 · Datos<br/>faltantes vs plan · réplicas por serie"]
+  B --> C{"2 · ¿Hay datos atípicos?<br/>Grubbs por serie (n ≥ 3) · ISO 5725-2 tabla 5<br/>(interlab: Mandel → Cochran → Grubbs)"}
   C -- NO --> D
-  C -- SÍ --> C1[Se señalan, no se borran · sensibilidad: se recalcula sin ellos y se muestra qué decisión cambiaría]
-  C1 --> C2[Exclusión definitiva solo con causa técnica, responsable y versión 2]
-  C1 --> D{3 · ¿Datos normales? Shapiro-Wilk α = 0,05}
-  D -- SÍ --> E{4 · ¿Varianzas iguales? Bartlett}
-  D -- NO --> E2{4 · ¿Varianzas iguales? Levene mediana}
-  E -- SÍ --> F1[5 · ANOVA factorial + Tukey HSD]
-  E -- NO --> F2[5 · ANOVA de Welch + Games-Howell]
-  E2 --> F3[5 · Kruskal-Wallis + Dunn-Holm]
-  F1 & F2 & F3 --> G[¿Dónde están las diferencias y por qué? técnico / patrón / interacción]
-  D -- SÍ --> S1[6 · Sesgo: t de Student]
-  D -- NO --> S2[6 · Sesgo: Wilcoxon]
-  G & S1 & S2 --> H[7 · Repetibilidad s_r · 8 · Reproducibilidad intralaboratorio s_I · s_R solo interlaboratorio]
-  H --> K{¿Límite aprobado?}
-  K -- no --> K0[Sin criterio]
-  K -- sí --> K1[Cumple / No cumple / Indeterminado por punto]
-  K1 --> V[Veredicto: TU MÉTODO SIRVE · SIRVE CON OBSERVACIONES · NO SIRVE + qué implica y qué hacer]
+  C -- SÍ --> C1["Se señalan, NO se borran<br/>sensibilidad: se recalcula sin ellos"]
+  C1 --> C2["Exclusión solo con causa técnica,<br/>responsable y versión 2"]
+  C1 --> D{"3a · ¿Residuos normales?<br/>Shapiro-Wilk, α = 0,05<br/>(supuesto del ANOVA)"}
+  D -- SÍ --> E{"4 · ¿Varianzas iguales?<br/>Bartlett"}
+  E -- SÍ --> F1["5 · ANOVA factorial<br/>+ Tukey HSD"]
+  E -- NO --> F2["5 · ANOVA de Welch<br/>+ Games-Howell"]
+  D -- NO --> F3["5 · SIN ANOVA<br/>Kruskal-Wallis + Dunn-Holm<br/>(Fligner-Killeen solo informa)"]
+  F1 & F2 & F3 --> G["¿Dónde están las diferencias y por qué?<br/>técnico · patrón · combinación"]
+  C -- NO --> DS
+  C1 --> DS{"3b · ¿Promedios de serie normales?<br/>Shapiro-Wilk (objeto del sesgo)"}
+  DS -- SÍ --> S1["6 · Sesgo: t de Student + IC 95 %"]
+  DS -- NO --> S2["6 · Sesgo: Wilcoxon (sin IC)"]
+  D -- SÍ --> P1["7–8 · s_r y s_I con IC χ²<br/>(prueba F de s_I solo si varianzas iguales)"]
+  D -- NO --> P2["7–8 · s_r y s_I solo estimación<br/>(sin prueba F ni IC χ²)"]
+  G & S1 & S2 & P1 & P2 --> K{"¿Límite aprobado?"}
+  K -- NO --> K0["Sin criterio"]
+  K -- SÍ --> K1["Cumple / No cumple / Indeterminado<br/>por punto"]
+  K1 --> V["Veredicto: SIRVE · SIRVE CON OBSERVACIONES · NO SIRVE<br/>+ qué implica y qué hacer"]
 ```
+
+![Árbol de decisión](diagramas/arbol_decision.png)
+
+### Secuencia y su fundamento
+
+| Paso | Pregunta | Prueba | Si SÍ | Si NO | Fuente |
+| --- | --- | --- | --- | --- | --- |
+| 1 | ¿Están los datos planificados? | Conteo frente al plan; réplicas por serie | Seguir | Informar faltantes; no imputar | ISO 5725-2 §7.2 |
+| 2 | ¿Hay datos atípicos? | Grubbs por serie (interlab: Mandel → Cochran → Grubbs) | Señalar; sensibilidad sin ellos; excluir solo con causa técnica y versión 2 | Seguir con todos | ISO 5725-2 §7.3; Grubbs (1969) |
+| 3a | ¿Los residuos son normales? | Shapiro-Wilk | Paso 4 | **Sin ANOVA**: Kruskal-Wallis + Dunn-Holm; s_r y s_I sin prueba F ni IC χ² | Shapiro & Wilk (1965); Montgomery (2017) §3.4 |
+| 3b | ¿Los promedios de serie son normales? | Shapiro-Wilk | Sesgo con t de Student e IC | Sesgo con Wilcoxon (simetría a revisar) | Eurachem §6.5; Wilcoxon (1945) |
+| 4 | ¿Varianzas iguales? (solo si 3a = SÍ) | Bartlett | ANOVA factorial + Tukey HSD | ANOVA de Welch + Games-Howell | Bartlett (1937); Welch (1951); Tukey (1949); Games & Howell (1976) |
+| 5 | ¿Influyen técnico, patrón o su combinación? | La de la ruta | Post hoc: dónde y cuánto; origen probable | El método es robusto a esos cambios | Montgomery (2017) cap. 3 y 5 |
+| 6–8 | ¿Cumple el límite? | Estimación o IC frente al límite aprobado | Cumple | No cumple / indeterminado / sin criterio | ISO/IEC 17025 §7.8.6 |
 
 ## Matriz de reglas (RM-xx)
 
@@ -56,5 +72,5 @@ Generada desde `src/motor/reglas.py`; la misma tabla aparece en el anexo B del i
 | RM-23 | Fuentes de variación por punto (técnico, patrón, interacción). | COMPLEMENTARIA | Montgomery (2017) |
 | RM-24 | α = 0,05, 95 % y Shapiro-Wilk fijos; solo se configuran los límites. | COMPLEMENTARIA | Especificación del equipo |
 | RM-25 | Cumple + normalidad rechazada → «cumple con observaciones». | COMPLEMENTARIA | Especificación del equipo |
-| RM-26 | Ruta condicional ANOVA/Welch/Kruskal y post hoc Tukey/Games-Howell/Dunn; Bartlett o Levene según normalidad. | COMPLEMENTARIA | Montgomery (2017) |
+| RM-26 | Normalidad → (solo si hay normalidad) Bartlett → ANOVA + Tukey o Welch + Games-Howell; sin normalidad nunca ANOVA: Kruskal-Wallis + Dunn-Holm (Fligner-Killeen solo informa); sin normalidad no se informan prueba F de s_I ni IC χ². | COMPLEMENTARIA | Montgomery (2017) cap. 3; Conover et al. (1981) |
 | RM-27 | Atípicos: se señalan, se mide su efecto (sensibilidad) y la exclusión la decide una persona. | NORMA | ISO 5725-2:1994 §7.3.2 |

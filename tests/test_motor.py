@@ -353,8 +353,9 @@ def test_fuentes_de_variacion_detecta_tecnico():
     fv = _r(r, "Fuentes de variación")[0]
     assert fv["estado"] == APLICABLE and fv["estimacion"]["influyen"] == ["Técnico"]
     filas = {f["fuente"]: f for f in fv["estimacion"]["anova"]}
-    assert {"Técnico", "Día", "Residual (repetibilidad)"} <= set(filas)
-    assert filas["Técnico"]["contribucion_pct"] > 90
+    assert {"Técnico", "Día"} <= set(filas)
+    efecto = filas["Técnico"]["contribucion_pct"] if fv["estimacion"]["ruta"] != "kruskal" else filas["Técnico"]["epsilon2"] * 100
+    assert efecto > 50
     donde = fv["estimacion"]["donde"]                 # dónde están las diferencias (prueba post hoc de la ruta elegida)
     assert len(donde) == 1 and donde[0]["comparacion"] in ("T-01 vs T-02", "T-02 vs T-01")
     assert abs(donde[0]["diferencia"]) == pytest.approx(0.3, abs=0.01)
@@ -376,8 +377,9 @@ def test_conforme_con_observaciones_si_no_normal():
 
 @pytest.mark.parametrize("asimetrico,ruta", [(False, "anova"), (True, "kruskal")])
 def test_ruta_condicional_de_comparacion(asimetrico, ruta):
-    """Entrada: 2 técnicos × 2 días × 5 réplicas con ruido normal o muy asimétrico. Esperado: con datos normales y varianzas similares
-    la ruta es ANOVA + Tukey; con datos no normales es Kruskal-Wallis + Dunn; la homocedasticidad usa Bartlett o Levene según el caso."""
+    """Entrada: 2 técnicos × 2 días × 5 réplicas con ruido normal o muy asimétrico. Esperado: con datos normales se aplica Bartlett y,
+    con varianzas similares, ANOVA + Tukey; sin normalidad NO se aplica ningún ANOVA (ni F, ni Welch, ni prueba F de s_I, ni IC χ²):
+    Kruskal-Wallis + Dunn, con Fligner-Killeen solo informativo."""
     from scipy import stats as st
     n = 20
     u = (np.arange(1, n + 1) - 0.375) / (n + 0.25)
@@ -388,8 +390,16 @@ def test_ruta_condicional_de_comparacion(asimetrico, ruta):
     r = ejecutar(t, e, cfg_intra(e, []))
     normal_res = _r(r, "Shapiro", "residuos")[0]["decision_inferencial"] == "No se rechaza H0"
     homo = _r(r, "Homocedasticidad")[0]
-    assert homo["tecnica"] == ("Homocedasticidad (Bartlett)" if normal_res else "Homocedasticidad (Levene (mediana))")
+    assert homo["tecnica"] == ("Homocedasticidad (Bartlett)" if normal_res else "Homocedasticidad (Fligner-Killeen, informativa)")
     fv = _r(r, "Fuentes de variación")[0]
+    pruebas = {f["prueba"] for f in fv["estimacion"]["anova"]}
+    if not normal_res:                                   # sin normalidad: ningún ANOVA (ni F, ni Welch, ni % de variación)
+        assert pruebas == {"Kruskal-Wallis (H)"} and fv["estimacion"]["r2"] is None
+        assert all(f["contribucion_pct"] is None and f["epsilon2"] is not None for f in fv["estimacion"]["anova"])
+        si = _r(r, "Reproducibilidad intralaboratorio")[0]
+        assert si["p_valor"] is None and si["ic"] == [None, None] and not si["estimacion"]["con_prueba_F"]
+        rep = _r(r, "Repetibilidad")[0]
+        assert rep["ic"] == [None, None]
     if normal_res and homo["decision_inferencial"] == "No se rechaza H0":
         assert fv["estimacion"]["ruta"] == "anova"
     elif not normal_res:

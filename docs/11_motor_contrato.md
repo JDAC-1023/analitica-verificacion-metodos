@@ -33,12 +33,14 @@ La matriz describe el diseño y la ingesta, pero no trae lo necesario para decid
 | Atípicos | Grubbs simple y doble sobre medias de celda (tabla 5) | Interlaboratorio, p ≥ 3 (doble p ≥ 4) | Norma |
 | Atípicos | Grubbs simple sobre réplicas de una celda | Intralaboratorio, n_ij ≥ 3 | Complementaria |
 | Atípicos | Dixon | NO_IMPLEMENTADO (sin tablas verificadas) | — |
-| Normalidad | Shapiro-Wilk / Anderson-Darling / Lilliefors | Sobre unidades del sesgo y residuos dentro de celda, por nivel | Complementaria |
+| Normalidad | Shapiro-Wilk (fijo) | Sobre promedios de serie (sesgo) y residuos dentro de celda (supuesto del ANOVA), por nivel | Complementaria |
+| Homocedasticidad | Bartlett, **solo si los residuos son normales** (decide ANOVA o Welch); con datos no normales, Fligner-Killeen solo informativo | ≥ 2 series con ≥ 3 lecturas | Complementaria (RM-26) |
 | Desempeño | Sesgo: t de Student / Wilcoxon / solo estimación | Según normalidad y n de unidades independientes | Complementaria (Eurachem §6.5) |
-| Desempeño | Repetibilidad s_r (ec. 20) con IC χ² | Al menos una celda con réplicas | Norma |
-| Desempeño | Precisión intermedia s_I (ANOVA un factor, Satterthwaite) | ≥ 2 grupos, alguno con réplicas | Complementaria (Eurachem §6.6.4) |
+| Desempeño | Repetibilidad s_r (ec. 20); IC χ² solo con residuos normales | Al menos una celda con réplicas | Norma |
+| Desempeño | Reproducibilidad intralaboratorio s_I (componentes de varianza); prueba F e IC χ² solo con residuos normales (F, además, con varianzas iguales) | ≥ 2 grupos, alguno con réplicas | Complementaria (Eurachem §6.6.4; ISO 5725-3) |
 | Desempeño | Reproducibilidad s_R (ec. 19–24) | Solo interlaboratorio | Norma |
-| Desempeño | Fuentes de variación: ANOVA factorial (técnico, patrón, interacción; tipo II) | Intralaboratorio con factores declarados y réplicas | Complementaria (RM-23) |
+| Desempeño | Fuentes de variación (técnico, patrón, interacción): ANOVA + Tukey · Welch + Games-Howell · Kruskal-Wallis + Dunn-Holm según la ruta; nunca ANOVA sin normalidad | Intralaboratorio con factores declarados y réplicas | Complementaria (RM-23, RM-26) |
+| Atípicos | Sensibilidad: recálculo sin los atípicos para mostrar qué decisión cambiaría (no es exclusión) | Si Grubbs señala lecturas | Norma (RM-27) |
 | Limpieza | Réplicas por serie frente al plan | Siempre | Complementaria |
 | Criterios | Estimación o intervalo frente al límite | Criterio aprobado completo | Criterio del laboratorio |
 
@@ -76,7 +78,7 @@ Campos de la memoria (§10) por resultado: `analysis_id, etapa, tecnica, study_i
 ## 6. Límites conocidos de esta versión
 
 - Solo derivación «a − b». Otras fórmulas requieren una regla aprobada nueva en código.
-- Varios factores de precisión intermedia se combinan en un único factor (no se separan componentes por factor).
+- Para estimar s_I los factores se combinan en un único factor; su efecto por separado se prueba en «Fuentes de variación».
 - Sin IC para s_R.
 - La prueba t de sesgo no incorpora u_ref (se informa aparte).
 - Linealidad, LOD/LOQ, selectividad, robustez e incertidumbre: NO_IMPLEMENTADO (si se marcan como REQUERIDAS, la conclusión global queda INCOMPLETA).

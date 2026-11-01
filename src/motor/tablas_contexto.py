@@ -61,14 +61,19 @@ def resumen_fuentes(resultado: dict) -> tuple[list[str], list[list[str]]]:
         for f in r["estimacion"]["anova"]:
             if f["tipo"] != "residual" and f["fuente"] not in fuentes:
                 fuentes.append(f["fuente"])
-    cab = ["Punto"] + fuentes + ["Repetibilidad (residual)", "Conclusión"]
+    cab = ["Punto", "Prueba usada"] + fuentes + ["Repetibilidad (residual)", "Conclusión"]
     filas = []
     for r in rs:
         m = {f["fuente"]: f for f in r["estimacion"]["anova"]}
-        fila = [_punto(r)]
+        fila = [_punto(r), r["estimacion"].get("ruta_nombre", "")]
         for fu in fuentes:
             f = m.get(fu)
-            fila.append("—" if not f else f"p = {fmt_p(f['p'])} · {fmt(f['contribucion_pct'], 2)} %" + (" ✱" if f["influye"] else ""))
+            if not f:
+                fila.append("—")
+            elif f.get("epsilon2") is not None:
+                fila.append(f"p = {fmt_p(f['p'])} · ε² = {fmt(f['epsilon2'], 2)}" + (" ✱" if f["influye"] else ""))
+            else:
+                fila.append(f"p = {fmt_p(f['p'])} · {fmt(f['contribucion_pct'], 2)} %" + (" ✱" if f["influye"] else ""))
         res = m.get("Residual (repetibilidad)")
         fila.append(f"{fmt(res['contribucion_pct'], 2)} %" if res else "—")
         inf = r["estimacion"]["influyen"]

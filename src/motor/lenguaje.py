@@ -44,7 +44,7 @@ QUE_HACE = [
     ("Grubbs (réplicas)", "Busca un dato raro dentro de las repeticiones hechas en las mismas condiciones."),
     ("Grubbs", "Busca un laboratorio cuyo promedio sea raro frente a los demás."),
     ("Dixon", "Otra forma de buscar datos raros en grupos pequeños."),
-    ("Homocedasticidad", "Revisa si las series (técnico + patrón) tienen dispersiones parecidas; decide qué prueba se usa para compararlas."),
+    ("Homocedasticidad", "Solo si los datos son normales: revisa si las series tienen dispersiones parecidas (Bartlett) para elegir entre ANOVA clásico y ANOVA de Welch."),
     ("Shapiro", "Revisa si los datos tienen la forma de campana (distribución normal) que suponen varias pruebas."),
     ("Anderson", "Revisa si los datos tienen forma de campana, poniendo atención a los extremos."),
     ("Lilliefors", "Revisa si los datos tienen forma de campana."),
@@ -115,10 +115,14 @@ def _resultado(r: dict) -> str:
         return f"Se dejaron por fuera {r['n']} dato(s) por decisión técnica documentada; el dato original se conserva."
     if r["etapa"] == "homocedasticidad":
         e2 = r.get("estimacion") or {}
+        if "informativa" in r["tecnica"]:
+            return (f"Los datos no son normales, así que no se usa ANOVA: la comparación va directo a Kruskal-Wallis. "
+                    f"Como información, Fligner-Killeen da p = {fmt_p(r.get('p_valor'))}"
+                    + (" (hay series más dispersas que otras)." if di == "Se rechaza H0" else " (dispersiones parecidas)."))
         if di == "Se rechaza H0":
-            return (f"Las series NO tienen dispersiones parecidas (p = {fmt_p(r.get('p_valor'))}): la más dispersa es {e2.get('serie_max')} "
-                    f"(s = {fmt(e2.get('s_max'))}). Por eso la comparación usa una prueba que no exige varianzas iguales.")
-        return (f"Las series tienen dispersiones parecidas (p = {fmt_p(r.get('p_valor'))}); se puede usar la comparación clásica.")
+            return (f"Las series NO tienen dispersiones parecidas (Bartlett, p = {fmt_p(r.get('p_valor'))}): la más dispersa es "
+                    f"{e2.get('serie_max')} (s = {fmt(e2.get('s_max'))}). Por eso se compara con ANOVA de Welch.")
+        return (f"Las series tienen dispersiones parecidas (Bartlett, p = {fmt_p(r.get('p_valor'))}); se compara con ANOVA clásico.")
     if r["etapa"] == "normalidad":
         if di == "Se rechaza H0":
             return (f"Los datos NO tienen forma de campana (p = {fmt_p(r.get('p_valor'))}). "
@@ -148,14 +152,17 @@ def _resultado(r: dict) -> str:
         filas = [f for f in e.get("anova", []) if f.get("tipo") != "residual"]
         partes = []
         for f in filas:
-            pct = f" (explica {fmt(f['contribucion_pct'], 2)} % de la variación)" if f.get("contribucion_pct") is not None else ""
+            pct = (f" (explica {fmt(f['contribucion_pct'], 2)} % de la variación)" if f.get("contribucion_pct") is not None
+                   else f" (tamaño del efecto ε² = {fmt(f['epsilon2'], 2)})" if f.get("epsilon2") is not None else "")
             partes.append(f"{f['fuente']}: {'SÍ influye' if f['influye'] else 'no se detecta influencia'}, p = {fmt_p(f['p'])}{pct}")
         return "; ".join(partes) + "." if partes else r.get("texto", "")
     if tec.startswith("Repetibilidad"):
         return f"Al repetir en las mismas condiciones, los resultados varían típicamente ± {fmt(e.get('valor'))} {u} (desviación estándar)."
     if tec.startswith("Reproducibilidad intralaboratorio"):
         return (f"Cuando cambian técnico, día o patrón, la variación típica es ± {fmt(e.get('valor'))} {u}; "
-                f"de ella, ± {fmt(e.get('s_entre'))} {u} se debe al cambio de condiciones.")
+                f"de ella, ± {fmt(e.get('s_entre'))} {u} se debe al cambio de condiciones."
+                + ("" if e.get("con_prueba_F", True) else " (Sin prueba F porque los supuestos no se cumplen; la influencia de cada condición "
+                                                          "se evalúa en «Fuentes de variación».)"))
     if tec.startswith("Reproducibilidad interlaboratorio"):
         return f"Entre laboratorios, la variación típica es ± {fmt(e.get('valor'))} {u}."
     return r.get("texto", "")
@@ -237,7 +244,9 @@ def corto(r: dict) -> str:
     """Significado en pocas palabras de un resultado aplicado (para tablas)."""
     di = r.get("decision_inferencial") or ""
     if r["etapa"] == "homocedasticidad":
-        return "Varianzas distintas" if di == "Se rechaza H0" else "Varianzas similares"
+        if "informativa" in r["tecnica"]:
+            return "No decide (datos no normales)"
+        return "Varianzas distintas → Welch" if di == "Se rechaza H0" else "Varianzas similares → ANOVA"
     if r["etapa"] == "normalidad":
         return "No tiene forma de campana" if di == "Se rechaza H0" else "Compatible con campana"
     if r["etapa"] == "atipicos":

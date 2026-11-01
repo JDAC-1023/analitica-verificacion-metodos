@@ -87,6 +87,7 @@ ejemplos/, herramientas/   scripts de ejemplo y generación de documentación
 | 10_capturas.md | Capturas reales de la aplicación |
 | 11_motor_contrato.md | Campos que faltan en la matriz, contrato del motor, trazabilidad y erratas de tablas ISO |
 | 12_motor_reglas_y_arbol.md | Árbol de decisión y matriz de reglas RM-xx |
-| 13_conclusiones_rediseno_informe.md | Conclusiones automáticas, comentarios, versión 2 e informe PDF |
+| 13_conclusiones_rediseno_informe.md | Paso a paso, veredicto, conclusiones, comentarios, versión 2 e informe PDF |
+| diagramas/arbol_decision.png | Árbol de decisión del motor |
 | diagramas/ | Diagramas en Mermaid (editables) y PNG |
 | ESTADO.md | Qué está terminado, qué funciona y qué está pendiente |

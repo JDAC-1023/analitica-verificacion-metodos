@@ -34,9 +34,9 @@ REGLAS = {
     "RM-22": ("Dixon no se implementa: no se dispone de tablas críticas verificadas.", COMPLEMENTARIA, "Dixon (1950)"),
     "RM-23": ("Fuentes de variación: ANOVA factorial por punto (técnico, patrón, …) con interacciones solo si hay réplicas en cada combinación; la influencia se decide por el valor p.", COMPLEMENTARIA, "Montgomery (2017) cap. 5"),
     "RM-24": ("α = 0,05, confianza 95 % y Shapiro-Wilk son fijos: la decisión de las pruebas de hipótesis no es configurable; solo se configuran los límites de aceptación.", COMPLEMENTARIA, "Especificación del equipo (2026-11-01)"),
-    "RM-26": ("Ruta condicional: normal y varianzas iguales → ANOVA + Tukey; normal y varianzas distintas → Welch + Games-Howell; no normal → Kruskal-Wallis + Dunn. Homocedasticidad con Bartlett si hay normalidad y con Levene si no.", COMPLEMENTARIA, "Montgomery (2017) cap. 3"),
-    "RM-27": ("Si se detectan atípicos, se señalan, se calcula el efecto de excluirlos (sensibilidad) y la exclusión definitiva la decide una persona en una versión nueva.", NORMA, "ISO 5725-2:1994 §7.3.2"),
     "RM-25": ("Si el método cumple pero se rechazó la normalidad en alguna revisión, la conclusión es «cumple con observaciones».", COMPLEMENTARIA, "Especificación del equipo (2026-11-01)"),
+    "RM-26": ("Secuencia: normalidad (Shapiro-Wilk) → solo con normalidad, Bartlett → varianzas iguales: ANOVA + Tukey; varianzas distintas: Welch + Games-Howell. Sin normalidad no se aplica ningún ANOVA: Kruskal-Wallis + Dunn-Holm (Fligner-Killeen solo informa). Sin normalidad tampoco se informan prueba F de s_I ni intervalos χ².", COMPLEMENTARIA, "Montgomery (2017) cap. 3; Conover et al. (1981)"),
+    "RM-27": ("Si se detectan atípicos, se señalan, se calcula el efecto de excluirlos (sensibilidad) y la exclusión definitiva la decide una persona en una versión nueva.", NORMA, "ISO 5725-2:1994 §7.3.2"),
 }
 
 
