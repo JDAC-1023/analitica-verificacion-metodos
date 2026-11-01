@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import os
 import sys
 from pathlib import Path
 
@@ -11,6 +12,7 @@ import pytest
 from openpyxl import load_workbook
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+os.environ.setdefault("AVM_SIN_TESTEOS", "1")  # la carga inicial de los testeos se prueba aparte
 
 from src.persistencia.repositorio import RepositorioLocal  # noqa: E402
 from src.plantillas.diligenciar import diligenciar_plantilla  # noqa: E402

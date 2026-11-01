@@ -8,6 +8,7 @@ Produce (sobrescribe):
     docs/04_matriz_reglas_calidad.md  y  docs/04_matriz_reglas_calidad.csv
     docs/07_pruebas.md            (ejecuta pytest y registra el resultado real de cada prueba)
     docs/08_librerias.md          (versiones realmente instaladas)
+    docs/14_diccionario_analisis.md (configuración, memoria de cálculo y reglas del motor)
 
 Así la documentación no puede contradecir al código.
 """
@@ -96,6 +97,53 @@ def escribir_diccionario() -> None:
     (DOCS / "01_diccionario_datos.md").write_text("".join(texto), encoding="utf-8")
 
 
+# ------------------------------------------------------------------ diccionario del análisis
+def escribir_diccionario_analisis() -> None:
+    """Campos de la configuración del análisis (config.json), de cada resultado (resultado.json) y reglas del motor."""
+    from src.motor import configuracion as cfgm
+    from src.motor import resultado as resm
+    from src.motor.reglas import matriz
+    clases = [(cfgm, "ConfiguracionAnalisis", "Configuración de una versión del análisis (analisis/vNNN/config.json)"),
+              (cfgm, "CaracteristicaConfig", "Estado de cada característica de desempeño"),
+              (cfgm, "ReferenciaNivel", "Valor de referencia por punto (para el sesgo)"),
+              (cfgm, "CriterioMotor", "Límite de aceptación estructurado"),
+              (cfgm, "Exclusion", "Exclusión documentada (solo en versiones derivadas)"),
+              (cfgm, "ReglaDerivacion", "Regla aprobada para un resultado calculado (a − b)"),
+              (resm, "ResultadoAnalisis", "Memoria de cálculo de cada prueba (lista «resultados» de resultado.json)"),
+              (resm, "NodoDecision", "Paso del árbol de decisiones (lista «arbol» de resultado.json)")]
+    filas = []
+    for mod, nombre, desc in clases:
+        for linea in inspect.getsource(getattr(mod, nombre)).splitlines():
+            m = PATRON.match(linea)
+            if not m or linea.strip().startswith(("def ", "@", "return")):
+                continue
+            campo, tipo, defecto, comentario = m.groups()
+            filas.append({"Entidad": nombre, "Desc": desc, "Campo": campo, "Tipo": tipo.strip(),
+                          "Valor por defecto": (defecto or "obligatorio").strip(), "Nota": (comentario or "").strip()})
+    df = pd.DataFrame(filas)
+    texto = ["# Diccionario de datos · análisis estadístico\n\n",
+             "> Generado automáticamente desde `src/motor/configuracion.py` y `src/motor/resultado.py` por "
+             "`herramientas/generar_documentacion.py`. No editar a mano.\n\n",
+             "Archivos por versión de análisis: `datos_locales/estudios/<código>/analisis/vNNN/` → `config.json` (entrada), "
+             "`resultado.json` (memoria de cálculo, inmutable), `comentarios.json` (retroalimentación por etapa, solo se agrega), "
+             "`informe_<fecha>.pdf` + `.pdf.json` (informes emitidos con SHA-256).\n\n",
+             "Claves de primer nivel de `resultado.json`: `meta`, `objeto`, `estructura`, `ruta`, `resultados`, `arbol`, "
+             "`caracteristicas`, `conclusion_final`, `conclusiones`, `datos`, `excluidas`, `reglas`, `sensibilidad`.\n"]
+    for entidad, grupo in df.groupby("Entidad", sort=False):
+        texto.append(f"\n## {entidad}\n\n{grupo['Desc'].iloc[0]}.\n\n")
+        texto.append(_md(grupo[["Campo", "Tipo", "Valor por defecto", "Nota"]]))
+    dominios = [("Estado de aplicabilidad", "APLICABLE, NO_APLICABLE, DATOS_INSUFICIENTES, NO_IMPLEMENTADO, PENDIENTE_MODELO"),
+                ("Decisión metrológica", "CONFORME, NO_CONFORME, INDETERMINADO, CALCULADO_SIN_EVALUACION"),
+                ("Conclusión global", "CONFORME, CONFORME_CON_OBSERVACIONES, NO_CONFORME, INDETERMINADO, INCOMPLETO, CALCULADO_SIN_EVALUACION, SIN_ALCANCE"),
+                ("Origen de la regla", "NORMA, COMPLEMENTARIA, CRITERIO_LAB"),
+                ("Etapas", "limpieza, atipicos, normalidad, homocedasticidad, desempeno"),
+                ("Ruta de comparación", "anova (ANOVA + Tukey), welch (Welch + Games-Howell), kruskal (Kruskal-Wallis + Dunn-Holm)"),
+                ("Características", ", ".join(cfgm.CARACTERISTICAS)), ("Estado de característica", ", ".join(cfgm.ESTADOS_CARACTERISTICA))]
+    texto.append("\n## Dominios\n\n" + _md(pd.DataFrame(dominios, columns=["Campo", "Valores"])))
+    texto.append("\n## Reglas del motor (RM-xx)\n\n" + _md(pd.DataFrame(matriz())))
+    (DOCS / "14_diccionario_analisis.md").write_text("".join(texto), encoding="utf-8")
+
+
 # ------------------------------------------------------------------ reglas
 def escribir_reglas() -> None:
     df = pd.DataFrame([r.to_dict() for r in REGLAS.values()]).rename(columns={
@@ -137,6 +185,11 @@ LIBRERIAS = [
     ("openpyxl", "Generar y leer la plantilla Excel con estilos, validaciones, protección y hojas ocultas", "src/plantillas, src/ingesta", "Permite controlar celda a celda el libro .xlsx sin Excel instalado."),
     ("pyarrow", "Dependencia de Streamlit para mostrar tablas", "(indirecta)", "Requerida por Streamlit."),
     ("pytest", "Pruebas automatizadas", "tests/", "Estándar de pruebas en Python; usado también en GitHub Actions."),
+    ("scipy", "Distribuciones t, F, χ² y rango estudentizado; Shapiro-Wilk, Wilcoxon, Bartlett, Fligner-Killeen, Kruskal-Wallis", "src/motor", "Implementaciones de referencia revisadas por pares (Virtanen et al., 2020)."),
+    ("statsmodels", "ANOVA factorial tipo II, Tukey HSD y Lilliefors", "src/motor/fuentes.py, src/motor/normalidad.py", "Implementaciones de referencia del modelo lineal (Seabold & Perktold, 2010)."),
+    ("matplotlib", "Gráficos de diagnóstico (Q-Q, Mandel h/k, puntos por celda) y fuente DejaVu para el PDF", "src/motor/graficos.py, src/informes", "Genera PNG sin servidor gráfico; trae fuentes con símbolos ², σ, χ, ≤."),
+    ("reportlab", "Informe técnico en PDF", "src/informes/pdf.py", "Solicitado por el equipo; control total de tablas, saltos de página y numeración."),
+    ("pypdf", "Leer el PDF generado en las pruebas", "tests/", "Comprueba el contenido real del informe."),
 ]
 
 
@@ -153,8 +206,9 @@ def escribir_librerias() -> None:
              f"> Versiones leídas del entorno real con `importlib.metadata` el {datetime.now():%Y-%m-%d %H:%M} · Python {platform.python_version()} · {platform.system()}.\n\n",
              _md(pd.DataFrame(filas)),
              f"\nBiblioteca estándar de Python usada: {estandar}.\n\n",
-             "No se añadieron dependencias nuevas respecto al entorno existente: `openpyxl` ya estaba instalado, pero faltaba en `requirements.txt` "
-             "(se agregó, junto con su dependencia `et_xmlfile`). El archivo `requirements.txt` se convirtió de UTF-16 a UTF-8.\n"]
+             "Dependencias agregadas para el motor y el informe: scipy, statsmodels, matplotlib, reportlab y pypdf (con sus dependencias "
+             "fijadas en `requirements.txt`). `wrapt` se fija en 2.5.2 porque `formulaic` admite versiones preliminares y pip instalaría una de desarrollo. "
+             "La instalación limpia se comprobó en un entorno nuevo (`pip check` sin conflictos).\n"]
     (DOCS / "08_librerias.md").write_text("".join(texto), encoding="utf-8")
 
 
@@ -193,7 +247,8 @@ def escribir_pruebas() -> int:
     texto = ["# Pruebas realizadas\n\n",
              f"> Generado ejecutando `pytest` el {datetime.now():%Y-%m-%d %H:%M} · Python {platform.python_version()} · "
              f"{platform.system()} · pytest {version('pytest')}. Resultado: {resumen}.\n\n",
-             "Todas las pruebas usan **datos sintéticos** (estudio de ejemplo de 16 mediciones: 2 puntos × 2 técnicos × 2 días × 2 repeticiones). "
+             "Todas las pruebas usan **datos sintéticos** (estudio de ejemplo de 16 mediciones: 2 puntos × 2 técnicos × 2 días × 2 repeticiones) "
+             "y, para el motor, los datos del **anexo B.1 de ISO 5725-2:1994** (azufre en carbón, 8 laboratorios × 4 niveles). "
              "La «entrada» y el «resultado esperado» se toman del docstring de cada prueba; el «resultado obtenido» es el de esta ejecución.\n\n",
              _md(df),
              "\n## Cobertura de los casos solicitados\n\n",
@@ -215,6 +270,21 @@ def escribir_pruebas() -> int:
                  ("Exportación del conjunto preparado", "test_exportacion_del_conjunto_preparado"),
                  ("Reproducibilidad de la salida", "test_reproducibilidad_de_la_salida, test_integridad_detecta_modificacion"),
                  ("Persistencia entre sesiones", "test_persistencia_entre_sesiones"),
+                 ("Motor · tablas ISO 5725-2:1994 frente a fórmula", "test_tablas_transcritas_coinciden_con_formula, test_tabla_mandel_k_y_errata_documentada"),
+                 ("Motor · anexo B.1 de ISO 5725-2", "test_iso_b1_tabla_b5, test_iso_b1_nivel1_desde_estadisticos_redondeados, test_iso_b1_cochran, test_iso_b1_grubbs"),
+                 ("Motor · normal y cumple / no cumple", "test_escenario_normal"),
+                 ("Motor · no normal y cumple / no cumple", "test_escenario_no_normal"),
+                 ("Motor · datos faltantes y celda con n=1, desbalance", "test_faltantes_no_se_imputan_y_celda_n1"),
+                 ("Motor · dependencia (unidades independientes = medias de celda)", "test_escenario_normal"),
+                 ("Motor · sin criterio / p no significativo", "test_sin_criterio_calculado_sin_evaluacion, test_p_no_significativo_no_es_conformidad"),
+                 ("Motor · edición normativa distinta", "test_edicion_normativa_distinta"),
+                 ("Motor · técnicos no son laboratorios", "test_intralaboratorio_no_aplica_cochran_ni_reproducibilidad"),
+                 ("Motor · exclusión con versión derivada", "test_exclusion_documentada_y_recalculo, test_flujo_completo_version2_comentarios_e_informe"),
+                 ("Informe PDF, comentarios, versión 2 y clonación", "test_flujo_completo_version2_comentarios_e_informe, test_clonar_estudio"),
+                 ("Ruta condicional: sin normalidad no hay ANOVA", "test_ruta_condicional_de_comparacion"),
+                 ("Dónde están las diferencias (post hoc) y su origen", "test_fuentes_de_variacion_detecta_tecnico"),
+                 ("Paso a paso, sensibilidad de atípicos y veredicto", "test_flujo_condicional_y_veredicto"),
+                 ("Bases de prueba: 4 escenarios, errores sembrados, series de 5", "test_crear_estudios_de_prueba"),
              ], columns=["Caso solicitado", "Prueba(s)"])),
              "\n## Limitaciones de las pruebas\n\n"
              "- Las pruebas de interfaz (`test_interfaz.py`) comprueban que cada página se ejecuta sin errores y que se puede crear un estudio; "
@@ -230,6 +300,7 @@ def escribir_pruebas() -> int:
 if __name__ == "__main__":
     DOCS.mkdir(exist_ok=True)
     escribir_diccionario()
+    escribir_diccionario_analisis()
     escribir_reglas()
     escribir_librerias()
     codigo = escribir_pruebas()

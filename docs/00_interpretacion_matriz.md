@@ -23,7 +23,7 @@ Fuente: `01_Matriz_Parametrizacion_Estudios_Actualizada.xlsx`, con sus 8 hojas: 
 | Planificación | P01–P04, D09, D10 | `MedicionPlanificada` |
 | Aprobación técnica | P05, X07, C03, D08 | Aprobación del diseño (versión inmutable), aprobación del conjunto preparado, campo `aprobado` del criterio y unidad experimental (pendiente técnico) |
 | Generado por el sistema | E02, V10, X01, X05, X06, X08, X09 | Código del estudio, IDs, plantilla, carga, reglas de calidad, historial, transformaciones |
-| Fase posterior | S01–S03 | Secciones reservadas «Análisis estadístico» e «Informes» |
+| Análisis e informes | S01–S03 | «Análisis estadístico» (motor de reglas, ver `11`–`13`) e «Informes» (PDF) |
 
 **Campos obligatorios, opcionales y condicionales.** Se tomó la columna «Cuándo se solicita» de la matriz:
 
@@ -51,7 +51,7 @@ Ninguna decisión pendiente se resolvió inventando un requisito metrológico. D
 | PD12 resultados directos | Ámbito «medición»: columna propia en «Mediciones». Otros ámbitos: hoja «Resultados_directos» con un registro por grupo | `especificacion.py` |
 | PD13 versiones | Aprobar congela una versión inmutable con huella SHA-256. Editar devuelve a borrador; aprobar otra vez crea vN+1. Cada carga queda vinculada a su versión y nunca se sobrescribe | `RepositorioLocal` |
 | PD17 calidad | 20 reglas RC01–RC20 (ver `04_matriz_reglas_calidad.md`) | `src/calidad/reglas.py` |
-| PD14, PD18, PD19 | Fase posterior (motor, escenarios, informe). No se implementan | — |
+| PD14, PD18, PD19 | Implementados en la versión 3–5: motor (`src/motor/`), escenarios de prueba (`data/estudios_prueba/`) e informe PDF | `11`–`13` |
 | PD15 Supabase | Repositorio local con el mismo contrato (`Repositorio`). El esquema de Supabase se escribe cuando apruebes el modelo | `src/persistencia/` |
 | PD16 validar lenguaje | Las preguntas de la hoja «Lenguaje del usuario» se usan tal cual en la interfaz. Falta validarlas con un usuario del laboratorio | — |
 

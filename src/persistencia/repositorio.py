@@ -18,6 +18,11 @@ Estructura en disco:
         preparaciones/<prep_id>/
           preparacion.json          parámetros y conteos de la preparación
           conjunto_preparado.zip    salida para el motor estadístico
+        analisis/v001/
+          config.json               configuración del análisis (contrato del motor)
+          resultado.json            memoria de cálculo completa (inmutable una vez ejecutado)
+          comentarios.json          retroalimentación humana por etapa (solo se agrega)
+          informe_<fecha>.pdf       informes técnicos emitidos
 """
 
 from __future__ import annotations
@@ -57,6 +62,15 @@ class Repositorio(Protocol):  # contrato que también deberá cumplir Supabase
     def obtener_preparacion(self, codigo: str, prep_id: str) -> dict[str, Any]: ...
     def obtener_archivo_preparacion(self, codigo: str, prep_id: str, nombre: str) -> bytes: ...
     def actualizar_preparacion(self, codigo: str, prep: dict[str, Any]) -> None: ...
+    def guardar_config_analisis(self, codigo: str, config: dict[str, Any]) -> None: ...
+    def guardar_resultado_analisis(self, codigo: str, version: int, resultado: dict[str, Any]) -> None: ...
+    def listar_analisis(self, codigo: str) -> list[dict[str, Any]]: ...
+    def obtener_analisis(self, codigo: str, version: int) -> dict[str, Any]: ...
+    def agregar_comentario(self, codigo: str, version: int, etapa: str, texto: str, usuario: str) -> dict[str, Any]: ...
+    def guardar_informe(self, codigo: str, version: int, contenido: bytes, metadatos: dict[str, Any]) -> str: ...
+    def listar_informes(self, codigo: str) -> list[dict[str, Any]]: ...
+    def obtener_informe(self, codigo: str, version: int, nombre: str) -> bytes: ...
+    def clonar_estudio(self, codigo: str, nombre: str, usuario: str) -> Estudio: ...
 
 
 _SEGURO = re.compile(r"^[A-Za-z0-9_.-]+$")
@@ -233,3 +247,81 @@ class RepositorioLocal:
 
     def actualizar_preparacion(self, codigo: str, prep: dict[str, Any]) -> None:
         _escribir_json(self._dir(codigo) / "preparaciones" / _seguro(prep["preparacion_id"]) / "preparacion.json", prep)
+
+    # ------------------------------------------------------------------ análisis estadístico
+    def _dir_analisis(self, codigo: str, version: int) -> Path:
+        return self._dir(codigo) / "analisis" / f"v{int(version):03d}"
+
+    def guardar_config_analisis(self, codigo: str, config: dict[str, Any]) -> None:
+        carpeta = self._dir_analisis(codigo, config["version"])
+        if (carpeta / "resultado.json").exists():
+            raise ErrorRepositorio(f"La versión {config['version']} del análisis ya se ejecutó y es inmutable: crea una nueva versión.")
+        _escribir_json(carpeta / "config.json", config)
+
+    def guardar_resultado_analisis(self, codigo: str, version: int, resultado: dict[str, Any]) -> None:
+        carpeta = self._dir_analisis(codigo, version)
+        if (carpeta / "resultado.json").exists():
+            raise ErrorRepositorio(f"La versión {version} del análisis ya tiene resultado.")
+        _escribir_json(carpeta / "resultado.json", resultado)
+
+    def listar_analisis(self, codigo: str) -> list[dict[str, Any]]:
+        salida = []
+        for ruta in sorted((self._dir(codigo) / "analisis").glob("v*/config.json")):
+            c = _leer_json(ruta)
+            res = ruta.parent / "resultado.json"
+            final = _leer_json(res).get("conclusion_final", {}) if res.exists() else {}
+            salida.append({"version": c["version"], "padre": c.get("padre"), "motivo_cambio": c.get("motivo_cambio", ""),
+                           "objeto": c.get("objeto_id", ""), "preparacion_id": c.get("preparacion_id", ""),
+                           "creado_en": c.get("creado_en", ""), "elaborado_por": c.get("elaborado_por", ""),
+                           "ejecutado": res.exists(), "estado_final": final.get("estado", "")})
+        return salida
+
+    def obtener_analisis(self, codigo: str, version: int) -> dict[str, Any]:
+        carpeta = self._dir_analisis(codigo, version)
+        res = carpeta / "resultado.json"
+        com = carpeta / "comentarios.json"
+        return {"config": _leer_json(carpeta / "config.json"),
+                "resultado": _leer_json(res) if res.exists() else None,
+                "comentarios": _leer_json(com) if com.exists() else []}
+
+    def agregar_comentario(self, codigo: str, version: int, etapa: str, texto: str, usuario: str) -> dict[str, Any]:
+        if not texto.strip():
+            raise ErrorRepositorio("El comentario está vacío.")
+        ruta = self._dir_analisis(codigo, version) / "comentarios.json"
+        lista = _leer_json(ruta) if ruta.exists() else []
+        item = {"id": f"COM-{len(lista) + 1:03d}", "etapa": etapa, "texto": texto.strip(),
+                "usuario": usuario or "sin identificar", "fecha": ahora_iso()}
+        lista.append(item)
+        _escribir_json(ruta, lista)
+        self.registrar_evento(codigo, usuario, "comentario_analisis", {"version": version, "etapa": etapa, "id": item["id"]})
+        return item
+
+    def guardar_informe(self, codigo: str, version: int, contenido: bytes, metadatos: dict[str, Any]) -> str:
+        carpeta = self._dir_analisis(codigo, version)
+        nombre = f"informe_{ahora_iso().replace(':', '').replace('-', '')[:15]}.pdf"
+        (carpeta / nombre).write_bytes(contenido)
+        _escribir_json(carpeta / (nombre + ".json"), {**metadatos, "archivo": nombre, "version": version})
+        self.registrar_evento(codigo, metadatos.get("emitido_por", ""), "informe_emitido",
+                              {"version": version, "archivo": nombre, "sha256": metadatos.get("sha256")})
+        return nombre
+
+    def listar_informes(self, codigo: str) -> list[dict[str, Any]]:
+        return sorted((_leer_json(r) for r in (self._dir(codigo) / "analisis").glob("v*/informe_*.pdf.json")),
+                      key=lambda x: x.get("fecha", ""))
+
+    def obtener_informe(self, codigo: str, version: int, nombre: str) -> bytes:
+        return (self._dir_analisis(codigo, version) / _seguro(nombre)).read_bytes()
+
+    # ------------------------------------------------------------------ rediseño
+    def clonar_estudio(self, codigo: str, nombre: str, usuario: str) -> Estudio:
+        """Crea un estudio nuevo con el diseño del original, en borrador, sin cargas ni análisis."""
+        original = self.obtener_estudio(codigo)
+        nuevo = self.crear_estudio(nombre or f"{original.nombre} (versión 2)", usuario)
+        datos = original.to_dict()
+        datos.update({"codigo": nuevo.codigo, "nombre": nuevo.nombre, "estado": "borrador", "version_diseno": 0,
+                      "aprobado_por": "", "fecha_aprobacion": "", "creado_en": nuevo.creado_en,
+                      "derivado_de": f"{codigo} v{original.version_diseno}", "paso_asistente": 1})
+        clon = Estudio.from_dict(datos)
+        self.guardar_estudio(clon, usuario, f"Clonado desde {codigo}")
+        self.registrar_evento(codigo, usuario, "estudio_clonado", {"nuevo": clon.codigo})
+        return clon

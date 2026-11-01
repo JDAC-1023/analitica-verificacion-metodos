@@ -27,6 +27,8 @@ PAGINAS = {
     "carga": "interfaz/paginas/carga.py",
     "calidad": "interfaz/paginas/calidad.py",
     "datos": "interfaz/paginas/datos.py",
+    "analisis": "interfaz/paginas/analisis.py",
+    "informes": "interfaz/paginas/informes.py",
 }
 
 ETIQUETA_ESTADO = {
@@ -79,11 +81,23 @@ def requerir_estudio() -> Estudio:
     e = estudio_actual()
     if e is None:
         with st.container(border=True):
-            st.markdown("#### :material/folder_open: Aún no has elegido un estudio")
-            st.write("Pulsa **Crear estudio** en la barra lateral o selecciona uno existente para continuar.")
-            st.page_link(PAGINAS["asistente"], label="Crear o continuar un estudio", icon=":material/arrow_forward:")
+            st.markdown("#### :material/folder_open: Aún no has abierto un estudio")
+            st.write("Ve a **Inicio** y pulsa **Abrir** en el estudio que quieres revisar, o crea uno nuevo.")
+            st.page_link(PAGINAS["inicio"], label="Elegir un estudio en Inicio", icon=":material/arrow_forward:")
         st.stop()
     return e
+
+
+def requerir_dependencias_motor() -> None:
+    """Detiene la página con instrucciones claras si faltan las librerías del motor."""
+    import importlib.util
+    faltan = [m for m in ("scipy", "statsmodels", "matplotlib", "reportlab") if importlib.util.find_spec(m) is None]
+    if faltan:
+        with st.container(border=True):
+            st.error(f"Faltan librerías del motor: {', '.join(faltan)}.", icon=":material/extension_off:")
+            st.write("Cierra la aplicación (Ctrl + C en la terminal) y ejecuta, con el entorno activado:")
+            st.code(".\\.venv\\Scripts\\Activate.ps1\npython -m pip install -r requirements.txt\nstreamlit run app.py", language="powershell")
+        st.stop()
 
 
 def requerir_usuario() -> bool:
@@ -109,7 +123,7 @@ def encabezado(kicker: str, titulo: str, descripcion: str = "") -> None:
 
 def banda_de_pasos(e: Estudio | None) -> None:
     """Indicador de progreso del flujo completo para el estudio activo."""
-    pasos = ["Estudio", "Diseño", "Aprobación", "Plantilla", "Carga", "Calidad", "Datos preparados"]
+    pasos = ["Estudio", "Diseño", "Aprobación", "Plantilla", "Carga", "Calidad", "Datos preparados", "Análisis", "Informe"]
     hechos = set()
     if e is not None:
         etapas = {et.clave: et for et in revisar_estudio(e)}
@@ -123,8 +137,12 @@ def banda_de_pasos(e: Estudio | None) -> None:
         cargas = repo.listar_cargas(e.codigo)
         if any(c["estado_archivo"] == "leido" for c in cargas):
             hechos |= {"Carga", "Calidad"}
-        if repo.listar_preparaciones(e.codigo):
+        if any(p.get("aprobada") for p in repo.listar_preparaciones(e.codigo)):
             hechos.add("Datos preparados")
+        if any(v["ejecutado"] for v in repo.listar_analisis(e.codigo)):
+            hechos.add("Análisis")
+        if repo.listar_informes(e.codigo):
+            hechos.add("Informe")
     actual = next((p for p in pasos if p not in hechos), None)
     chips = []
     for p in pasos:

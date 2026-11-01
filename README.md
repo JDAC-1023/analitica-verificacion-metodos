@@ -5,13 +5,13 @@ Participantes: Jessica Alejandra González Segura y Juan David Ahumada Caro.
 
 ## Estado
 
-**Fase de parametrización, ingeniería de datos e ingesta: funcional y probada (86 pruebas automatizadas).**
-El flujo completo funciona: crear estudio → configurar el método → condiciones → mediciones → resultados de interés → revisar y aprobar → plantilla Excel → registrar datos → cargar → verificar calidad → gestionar incidencias → preparar → descargar el conjunto normalizado.
-El motor estadístico y los informes son fases posteriores (secciones reservadas en la aplicación). El detalle está en [`docs/ESTADO.md`](docs/ESTADO.md).
+**Parametrización, ingesta, motor estadístico e informe PDF: funcionales y probados (126 pruebas automatizadas).**
+Flujo completo: crear estudio → plantilla Excel → subir DB → calidad → preparar y aprobar → **análisis estadístico** (limpieza, atípicos, normalidad, desempeño, criterios) con ruta de decisión en tiempo real → conclusiones y comentarios por etapa → versión 2 / clonar estudio → **informe técnico PDF**.
+El detalle está en [`docs/ESTADO.md`](docs/ESTADO.md).
 
 ## Tecnologías
 
-Python 3.13 · Streamlit 1.66 · pandas · openpyxl · pytest · Git/GitHub · GitHub Actions. Persistencia: local en archivos JSON, con un contrato listo para Supabase.
+Python 3.13 · Streamlit 1.66 · pandas · openpyxl · SciPy · statsmodels · matplotlib · ReportLab · pytest · Git/GitHub · GitHub Actions. Persistencia: local en archivos JSON, con un contrato listo para Supabase.
 
 ## Instalación en Windows (PowerShell, desde la carpeta del proyecto)
 
@@ -63,6 +63,8 @@ src/servicios/             flujo: cargar, preparar, aprobar; estudio de ejemplo
 src/exportacion/           conjunto preparado (SAL-1.0) y lector para el motor
 src/persistencia/          repositorio local (contrato listo para Supabase)
 src/auditoria/             huellas SHA-256
+src/motor/                 motor estadístico determinista (tablas ISO 5725-2:1994, reglas RM-xx, etapas, gráficos)
+src/informes/              informe técnico PDF (ReportLab)
 tests/                     pruebas automatizadas (datos sintéticos)
 docs/                      insumos técnicos editables para el documento académico
 ejemplos/, herramientas/   scripts de ejemplo y generación de documentación
@@ -83,5 +85,9 @@ ejemplos/, herramientas/   scripts de ejemplo y generación de documentación
 | 08_librerias.md | Librerías con su versión real (generado) |
 | 09_salida_para_el_motor.md | Salida que recibirá el motor estadístico |
 | 10_capturas.md | Capturas reales de la aplicación |
+| 11_motor_contrato.md | Campos que faltan en la matriz, contrato del motor, trazabilidad y erratas de tablas ISO |
+| 12_motor_reglas_y_arbol.md | Árbol de decisión y matriz de reglas RM-xx |
+| 13_conclusiones_rediseno_informe.md | Paso a paso, veredicto, conclusiones, comentarios, versión 2 e informe PDF |
+| diagramas/arbol_decision.png | Árbol de decisión del motor |
 | diagramas/ | Diagramas en Mermaid (editables) y PNG |
 | ESTADO.md | Qué está terminado, qué funciona y qué está pendiente |

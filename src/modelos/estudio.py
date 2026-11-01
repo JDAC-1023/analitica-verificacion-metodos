@@ -191,6 +191,7 @@ class Estudio:
     creado_en: str = ""
     actualizado_en: str = ""
     paso_asistente: int = 1              # último paso abierto del asistente de creación (no forma parte del diseño)
+    derivado_de: str = ""                # «EST-0001 v2» si se creó con «Clonar estudio» (rediseño)
 
     # ------------------------------------------------------------------
     def to_dict(self) -> dict[str, Any]:

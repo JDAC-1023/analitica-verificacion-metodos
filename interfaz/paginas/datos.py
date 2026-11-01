@@ -53,6 +53,38 @@ if not prep["aprobada"]:
             st.rerun()
         except ErrorFlujo as exc:
             st.error(str(exc))
+else:
+    with b3:
+        if st.button("Siguiente: Análisis estadístico", type="primary", icon=":material/arrow_forward:", width="stretch",
+                     key="ir_analisis"):
+            st.switch_page(PAGINAS["analisis"])
+
+with st.container(border=True):
+    st.markdown("#### :material/cleaning_services: Reporte de limpieza: qué se limpió y con qué")
+    from src.servicios import reporte_limpieza
+    rep = reporte_limpieza.construir(repo, e.codigo, prep_id)
+    for paso, texto in rep["pasos"]:
+        st.markdown(f"**{paso}.** {texto}")
+    l1, l2 = st.columns(2)
+    with l1:
+        st.markdown("**Reglas de calidad aplicadas a cada fila**")
+        tabla(pd.DataFrame(rep["reglas"])[["codigo", "nombre", "que_revisa", "si_falla", "resultado"]].rename(columns={
+            "codigo": "Regla", "nombre": "Nombre", "que_revisa": "Qué revisa", "si_falla": "Si falla", "resultado": "Resultado"}),
+            height=280)
+    with l2:
+        st.markdown("**Herramientas de limpieza (transformaciones)**")
+        tabla(pd.DataFrame(rep["transformaciones"])[["codigo", "nombre", "ejemplo", "autorizada", "veces"]].rename(columns={
+            "codigo": "Código", "nombre": "Qué hace", "ejemplo": "Ejemplo", "autorizada": "Autorizada", "veces": "Veces aplicada"}))
+        st.markdown("**Lo que la limpieza nunca hace**")
+        st.markdown("\n".join(f"- {t}" for t in rep["nunca"]))
+    if st.button("Generar reporte de limpieza (PDF)", icon=":material/picture_as_pdf:", key=f"limp_{prep_id}"):
+        from src.informes.pdf import generar_reporte_limpieza
+        from datetime import date
+        estudio_v, _ = repo.obtener_version(e.codigo, prep["version_diseno"])
+        st.session_state[f"pdf_limp_{prep_id}"] = generar_reporte_limpieza(rep, estudio_v, date.today().isoformat(), usuario())
+    if st.session_state.get(f"pdf_limp_{prep_id}"):
+        st.download_button("Descargar reporte de limpieza", st.session_state[f"pdf_limp_{prep_id}"], type="primary",
+                           file_name=f"reporte_limpieza_{e.codigo}_{prep_id}.pdf", mime="application/pdf", icon=":material/download:")
 
 tablas = [("observaciones_analisis", "Vista de análisis"), ("mediciones", "Mediciones"), ("valores", "Datos experimentales"),
           ("resultados_valores", "Resultados registrados"), ("niveles_factores", "Condiciones"), ("registros_estado", "Estado de registros"),

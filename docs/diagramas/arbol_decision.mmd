@@ -1,0 +1,22 @@
+flowchart TD
+  A["Conjunto preparado y APROBADO"] --> B["1 · Datos<br/>faltantes vs plan · réplicas por serie"]
+  B --> C{"2 · ¿Hay datos atípicos?<br/>Grubbs por serie (n ≥ 3) · ISO 5725-2 tabla 5<br/>(interlab: Mandel → Cochran → Grubbs)"}
+  C -- NO --> D
+  C -- SÍ --> C1["Se señalan, NO se borran<br/>sensibilidad: se recalcula sin ellos"]
+  C1 --> C2["Exclusión solo con causa técnica,<br/>responsable y versión 2"]
+  C1 --> D{"3a · ¿Residuos normales?<br/>Shapiro-Wilk, α = 0,05<br/>(supuesto del ANOVA)"}
+  D -- SÍ --> E{"4 · ¿Varianzas iguales?<br/>Bartlett"}
+  E -- SÍ --> F1["5 · ANOVA factorial<br/>+ Tukey HSD"]
+  E -- NO --> F2["5 · ANOVA de Welch<br/>+ Games-Howell"]
+  D -- NO --> F3["5 · SIN ANOVA<br/>Kruskal-Wallis + Dunn-Holm<br/>(Fligner-Killeen solo informa)"]
+  F1 & F2 & F3 --> G["¿Dónde están las diferencias y por qué?<br/>técnico · patrón · combinación"]
+  C -- NO --> DS
+  C1 --> DS{"3b · ¿Promedios de serie normales?<br/>Shapiro-Wilk (objeto del sesgo)"}
+  DS -- SÍ --> S1["6 · Sesgo: t de Student + IC 95 %"]
+  DS -- NO --> S2["6 · Sesgo: Wilcoxon (sin IC)"]
+  D -- SÍ --> P1["7–8 · s_r y s_I con IC χ²<br/>(prueba F de s_I solo si varianzas iguales)"]
+  D -- NO --> P2["7–8 · s_r y s_I solo estimación<br/>(sin prueba F ni IC χ²)"]
+  G & S1 & S2 & P1 & P2 --> K{"¿Límite aprobado?"}
+  K -- NO --> K0["Sin criterio"]
+  K -- SÍ --> K1["Cumple / No cumple / Indeterminado<br/>por punto"]
+  K1 --> V["Veredicto: SIRVE · SIRVE CON OBSERVACIONES · NO SIRVE<br/>+ qué implica y qué hacer"]

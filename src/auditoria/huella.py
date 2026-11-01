@@ -27,7 +27,7 @@ def ahora_iso() -> str:
 
 # Campos de la configuración que NO forman parte del diseño experimental
 # y por eso no cambian la huella del diseño.
-CAMPOS_FUERA_DE_HUELLA = {"estado", "aprobado_por", "fecha_aprobacion", "creado_en", "actualizado_en", "version_diseno", "paso_asistente"}
+CAMPOS_FUERA_DE_HUELLA = {"estado", "aprobado_por", "fecha_aprobacion", "creado_en", "actualizado_en", "version_diseno", "paso_asistente", "derivado_de"}
 
 
 def huella_diseno(estudio_dict: dict[str, Any]) -> str:
