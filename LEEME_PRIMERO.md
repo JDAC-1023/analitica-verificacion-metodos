@@ -19,7 +19,7 @@ cd C:\ruta\a\analitica-verificacion-metodos
 git switch prototipo-alejandra
 git status                                          # que no haya cambios pendientes que te importen
 
-Expand-Archive -Path "$HOME\Downloads\entrega_v3_motor_informe.zip" -DestinationPath . -Force
+Expand-Archive -Path "$HOME\Downloads\entrega_v3_1_motor_pruebas.zip" -DestinationPath . -Force
 
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt           # instala las 5 librerías nuevas
