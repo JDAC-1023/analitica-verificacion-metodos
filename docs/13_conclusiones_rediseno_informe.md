@@ -7,6 +7,9 @@
 - **Mapa por punto:** ✔/✘ de cada parámetro en cada temperatura y si el resultado depende del técnico o del patrón.
 - **Evolución entre versiones:** v1 → v2… con su motivo y veredicto.
 
+## Varios resultados evaluados
+Con varios resultados (p. ej. corrección, inestabilidad, inhomogeneidad) la pantalla muestra primero el **veredicto por resultado evaluado** y un selector «Ver resultados y conclusiones de:». El PDF repite el resumen (1.k), los resultados por etapa (4.k) y el consolidado (5.k) para cada resultado, con el título «Resultado evaluado: …», y cierra con la conclusión del análisis completo. Los comentarios se guardan por resultado y etapa.
+
 ## Conclusiones preliminares automáticas
 `motor.conclusiones_por_etapa` redacta, con reglas fijas, una conclusión para limpieza, atípicos, normalidad, homocedasticidad y desempeño, y la conclusión consolidada. Estados globales: CONFORME, CONFORME_CON_OBSERVACIONES, NO_CONFORME, INDETERMINADO, INCOMPLETO (característica requerida sin resultado evaluable o no implementada), CALCULADO_SIN_EVALUACION, SIN_ALCANCE.
 

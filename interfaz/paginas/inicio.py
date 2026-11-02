@@ -148,15 +148,20 @@ def panel(e) -> None:
     with t_resul:
         if res:
             from src.motor import graficos
-            filas = [{"Característica": f["caracteristica"], "Decisión": resumen_global({"conclusion_final": {"estado": f["decision"], "texto": ""}})["etiqueta"].capitalize()
+            from src.motor.multi import partes
+            filas = [{"Resultado evaluado": parte["objeto"]["nombre"], "Característica": f["caracteristica"],
+                      "Decisión": resumen_global({"conclusion_final": {"estado": f["decision"], "texto": ""}})["etiqueta"].capitalize()
                       if f["decision"] in ("CONFORME", "NO_CONFORME", "INDETERMINADO", "CALCULADO_SIN_EVALUACION") else f["decision"],
                       "Valores": ", ".join(fmt(n["valor"]) for n in f["niveles"] if n["valor"] is not None)[:120]}
-                     for f in res["caracteristicas"] if f["niveles"]]
+                     for parte in partes(res) for f in parte["caracteristicas"] if f["niveles"]]
             tabla(pd.DataFrame(filas))
+            primero = partes(res)[0]
             g1, g2 = st.columns(2)
-            for col, fig in zip((g1, g2), (graficos.resumen_sesgo(res), graficos.resumen_precision(res))):
+            for col, fig in zip((g1, g2), (graficos.resumen_sesgo(primero), graficos.resumen_precision(primero))):
                 if fig:
                     col.image(fig, width="stretch")
+            if len(partes(res)) > 1:
+                st.caption(f"Gráficos de {primero['objeto']['nombre']}. Los demás resultados están en el análisis completo.")
         else:
             st.info("Sin resultados todavía.", icon=":material/pending:")
         st.page_link(PAGINAS["analisis"], label="Abrir el análisis completo", icon=":material/open_in_new:")

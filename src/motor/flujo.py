@@ -196,7 +196,20 @@ IMPLICA = {
 }
 
 
+def _veredicto_varios(resultado: dict) -> dict:
+    """Varios resultados evaluados: el título es el del más desfavorable; el texto dice cómo quedó cada uno."""
+    subs = resultado["objetos"]
+    base = veredicto({**subs[0], "conclusion_final": {**subs[0]["conclusion_final"], "estado": resultado["conclusion_final"]["estado"]}})
+    detalle = "; ".join(f"{x['objeto']['nombre']}: {veredicto(x)['titulo'].replace('TU MÉTODO ', '').lower()}" for x in subs)
+    return {"titulo": base["titulo"], "color": base["color"],
+            "texto": f"Se evaluaron {len(subs)} resultados, cada uno con todas sus pruebas por separado. {detalle}. "
+                     "El veredicto del método es el del resultado más desfavorable."}
+
+
 def implicaciones(resultado: dict) -> list[dict]:
+    if resultado.get("multi"):
+        return [{**i, "caracteristica": f"{x['objeto']['nombre']} · {i['caracteristica']}"}
+                for x in resultado["objetos"] for i in implicaciones(x)]
     u = resultado["objeto"]["unidad"]
     sens = resultado.get("sensibilidad") or {}
     salida = []
@@ -222,6 +235,8 @@ def implicaciones(resultado: dict) -> list[dict]:
 
 
 def veredicto(resultado: dict) -> dict:
+    if resultado.get("multi"):
+        return _veredicto_varios(resultado)
     estado = resultado["conclusion_final"]["estado"]
     imps = implicaciones(resultado)
     if estado == "CONFORME":

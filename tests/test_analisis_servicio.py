@@ -89,6 +89,7 @@ def test_crear_estudios_de_prueba(repo):
     deja 1 pendiente (dato vacío) y 1 con advertencia (hora); el motor da NO CUMPLE / CUMPLE / NO CUMPLE / CUMPLE CON OBSERVACIONES;
     detecta la lectura anómala sembrada (M0063), la serie incompleta y la influencia del técnico en el Testeo 1; no duplica al repetir."""
     from src.servicios.estudios_prueba import crear_estudios_prueba
+    from src.motor.multi import partes
     creados = crear_estudios_prueba(repo, "ana")
     assert [x["nombre"] for x in creados] == ["Testeo 1", "Testeo 2", "Testeo 3", "Testeo 4"]
     esperado = ["NO_CONFORME", "CONFORME", "NO_CONFORME", "CONFORME_CON_OBSERVACIONES"]
@@ -96,11 +97,14 @@ def test_crear_estudios_de_prueba(repo):
         c = x["conteos"]
         assert x["mediciones"] == 240 and c["normalizados"] == 2 and c["pendientes"] == 1 and c["con_advertencia"] == 1
         assert x["analisis"] == est, (x["nombre"], x["analisis"])
-        r = repo.obtener_analisis(x["codigo"], 1)["resultado"]
+        assert x["por_resultado"]["Corrección"] == est
+        total = repo.obtener_analisis(x["codigo"], 1)["resultado"]
+        assert [p["objeto"]["nombre"] for p in partes(total)] == ["Corrección", "Inestabilidad", "Inhomogeneidad"]
+        r = partes(total)[0]
         assert r["objeto"]["nombre"] == "Corrección" and len(r["datos"]) == 239
         series = next(y for y in r["resultados"] if y["tecnica"].startswith("Réplicas por serie"))
         assert series["estimacion"]["valor"] == 1 and series["tabla"][0]["válidas"] == 4
-    r1 = repo.obtener_analisis(creados[0]["codigo"], 1)["resultado"]
+    r1 = partes(repo.obtener_analisis(creados[0]["codigo"], 1)["resultado"])[0]
     marcadas = {t.get("medicion_id") for y in r1["resultados"] if y["etapa"] == "atipicos" for t in y["tabla"]
                 if t.get("clasificacion") in ("rezagado (*)", "atípico (**)")}
     assert "M0063" in marcadas
@@ -115,18 +119,19 @@ def test_flujo_condicional_y_veredicto(repo):
     Testeo 1 el atípico sembrado explica el incumplimiento de repetibilidad en −20 °C (sensibilidad) y el técnico T-03 aparece como
     origen de las diferencias."""
     from src.motor import flujo
+    from src.motor.multi import partes
     from src.servicios.estudios_prueba import crear_estudios_prueba
     creados = crear_estudios_prueba(repo, "ana")
     titulos = []
     for x in creados:
-        r = repo.obtener_analisis(x["codigo"], 1)["resultado"]
+        r = partes(repo.obtener_analisis(x["codigo"], 1)["resultado"])[0]
         pasos = [p["paso"] for p in flujo.pasos(r)]
         assert pasos == ["Datos", "¿Hay datos atípicos?", "¿Los datos son normales?", "¿Las varianzas son iguales (homocedasticidad)?",
                          "¿El resultado depende del técnico o del patrón?", "Sesgo (veracidad)", "Repetibilidad",
                          "Reproducibilidad intralaboratorio", "Veredicto"]
         titulos.append(flujo.veredicto(r)["titulo"])
     assert titulos == ["TU MÉTODO NO SIRVE (TODAVÍA)", "TU MÉTODO SIRVE", "TU MÉTODO NO SIRVE (TODAVÍA)", "TU MÉTODO SIRVE, CON OBSERVACIONES"]
-    r1 = repo.obtener_analisis(creados[0]["codigo"], 1)["resultado"]
+    r1 = partes(repo.obtener_analisis(creados[0]["codigo"], 1)["resultado"])[0]
     cambio = [c for c in r1["sensibilidad"]["cambios"] if c["cambia_decision"]]
     assert cambio and cambio[0]["caracteristica"] == "repetibilidad" and cambio[0]["decision_sin"] == "CONFORME"
     imps = {i["caracteristica"]: i for i in flujo.implicaciones(r1)}
@@ -149,3 +154,35 @@ def test_copias_viejas_en_la_carpeta_no_duplican(tmp_path):
                                           "04_No_Normal_Cumple.xlsx"]
     (tmp_path / "criterios_prueba.json").unlink()            # sin índice: uno por número de escenario
     assert len(archivos_de_prueba(tmp_path)) == 4
+
+
+def test_varios_resultados_cada_uno_con_todas_sus_pruebas(repo):
+    """Entrada: Testeo 1 con tres resultados evaluados (corrección, inestabilidad, inhomogeneidad). Esperado: cada resultado
+    tiene su propia secuencia completa (limpieza, atípicos, normalidad, homocedasticidad, desempeño), sus propios datos,
+    sus propios criterios y su propio veredicto; la inestabilidad y la inhomogeneidad no evalúan sesgo (no tienen referencia);
+    el veredicto del análisis es el más desfavorable; el PDF nombra cada resultado evaluado."""
+    from src.motor.multi import estado_combinado, partes, resumen_por_objeto
+    from src.servicios.estudios_prueba import crear_estudios_prueba
+    x = crear_estudios_prueba(repo, "ana")[0]
+    guardado = repo.obtener_analisis(x["codigo"], 1)
+    total = guardado["resultado"]
+    assert total["multi"] and len(partes(total)) == 3
+    for p in partes(total):
+        etapas = {y["etapa"] for y in p["resultados"]}
+        assert {"limpieza", "atipicos", "normalidad", "homocedasticidad", "desempeno"} <= etapas, p["objeto"]["nombre"]
+        assert all(y["unidad"] == "°C" for y in p["resultados"] if y["etapa"] == "desempeno")
+        crits = {y["requisito"].get("criterio") for y in p["resultados"] if y.get("requisito")}
+        pref = p["objeto"]["nombre"][:3].upper()
+        assert crits and all(c.startswith(pref) for c in crits), (p["objeto"]["nombre"], crits)
+        sesgo = [y for y in p["resultados"] if y["caracteristica"] == "sesgo"]
+        assert bool(sesgo) == (p["objeto"]["nombre"] == "Corrección")
+    valores = {p["objeto"]["nombre"]: p["datos"][0]["valor"] for p in partes(total)}
+    assert len(set(valores.values())) == 3                       # cada uno analiza su propia columna
+    assert total["conclusion_final"]["estado"] == estado_combinado([p["conclusion_final"]["estado"] for p in partes(total)])
+    assert [f["nombre"] for f in resumen_por_objeto(total)] == ["Corrección", "Inestabilidad", "Inhomogeneidad"]
+    estudio_v, _ = repo.obtener_version(x["codigo"], 1)
+    pdf = generar_informe(total, guardado["config"], estudio_v, [], historial(repo, x["codigo"]), [], {"fecha": "2026-11-01"})
+    texto = " ".join(pg.extract_text() for pg in PdfReader(__import__("io").BytesIO(pdf)).pages)
+    for nombre in ("Corrección", "Inestabilidad", "Inhomogeneidad"):
+        assert f"Resultado evaluado: {nombre}" in texto, nombre
+    assert "Veredicto por resultado evaluado" in texto

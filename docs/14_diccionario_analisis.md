@@ -40,6 +40,7 @@ Configuración de una versión del análisis (analisis/vNNN/config.json).
 | revisado_por | str | "" |  |
 | autorizado_por | str | "" |  |
 | creado_en | str | "" |  |
+| objetos | list[ObjetoAnalisis] | field(default_factory=list) |  |
 
 ## CaracteristicaConfig
 

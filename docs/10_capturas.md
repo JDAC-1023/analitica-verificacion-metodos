@@ -29,10 +29,11 @@
 
 | Captura | Qué muestra |
 | --- | --- |
-| ![Configurar](capturas/09_analisis_configurar.png) | **Configurar · qué se analiza y ruta.** Objeto (Corrección), verificación/validación, características y estructura del diseño. La versión ejecutada queda bloqueada (inmutable). |
+| ![Configurar](capturas/09_analisis_configurar.png) | **Configurar · qué resultados se evalúan.** Varios resultados a la vez (Corrección, Inestabilidad, Inhomogeneidad); cada uno corre todas las pruebas por separado. La versión ejecutada queda bloqueada (inmutable). |
 | ![Límites](capturas/09b_limites_reglas_fijas.png) | **Límites de aceptación y reglas fijas.** Lo único configurable son los límites (sesgo, repetibilidad, reproducibilidad intralaboratorio e interlaboratorio) con su fuente y aprobación. α = 0,05, 95 %, Shapiro-Wilk y tablas ISO son fijos (RM-24). |
 | ![Vista previa](capturas/09c_vista_previa.png) | **Qué va a hacer el motor (en vivo).** Por etapa, cada prueba con «se aplicó / no corresponde / faltan datos» y el porqué en palabras sencillas. |
-| ![Veredicto](capturas/10_resultados_veredicto.png) | **Resultados · veredicto.** «Tu método no sirve (todavía)», qué implica cada parámetro que no cumple y qué hacer, y el desempeño punto por punto (✔/✘). |
+| ![Veredicto](capturas/10_resultados_veredicto.png) | **Veredicto por resultado evaluado.** Tabla con el veredicto de cada resultado (Corrección no sirve; Inestabilidad e Inhomogeneidad sirven) y selector «Ver resultados y conclusiones de:». |
+| ![Resultado evaluado](capturas/10g_resultado_evaluado.png) | **Resultados · resultado evaluado.** Título «Resultado evaluado: Corrección (°C)», veredicto, qué implica cada parámetro que no cumple, qué hacer y desempeño punto por punto (✔/✘). |
 | ![Paso a paso](capturas/10b_paso_a_paso.png) | **Paso a paso del motor.** Flujo condicional: datos → ¿atípicos? (y qué pasa con ellos) → ¿normales? → ¿varianzas iguales? → prueba elegida → sesgo → repetibilidad → reproducibilidad → veredicto, con «por lo tanto…» en cada paso. |
 | ![Atípicos](capturas/10c_atipicos.png) | **Valores atípicos.** Cochran y Mandel «no corresponden» (un solo laboratorio, explicado); Grubbs por serie de 5 lecturas señala las lecturas atípicas, sin borrarlas. |
 | ![Homocedasticidad](capturas/10d_homocedasticidad.png) | **Homocedasticidad.** Solo donde los residuos son normales se aplica Bartlett, que decide entre ANOVA clásico y ANOVA de Welch; donde no son normales no se aplica ningún ANOVA (ruta Kruskal-Wallis) y Fligner-Killeen solo informa. |

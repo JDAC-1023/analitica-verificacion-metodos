@@ -5,7 +5,7 @@ Participantes: Jessica Alejandra González Segura y Juan David Ahumada Caro.
 
 ## Estado
 
-**Parametrización, ingesta, motor estadístico e informe PDF: funcionales y probados (127 pruebas automatizadas).**
+**Parametrización, ingesta, motor estadístico e informe PDF: funcionales y probados (128 pruebas automatizadas).**
 Flujo completo: crear estudio → plantilla Excel → subir DB → calidad → preparar y aprobar → **análisis estadístico** (limpieza, atípicos, normalidad, desempeño, criterios) con ruta de decisión en tiempo real → conclusiones y comentarios por etapa → versión 2 / clonar estudio → **informe técnico PDF**.
 El detalle está en [`docs/ESTADO.md`](docs/ESTADO.md).
 

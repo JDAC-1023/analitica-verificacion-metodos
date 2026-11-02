@@ -16,7 +16,8 @@ from src.auditoria.huella import sha256_bytes
 from src.motor import graficos
 from src.motor.configuracion import (CARACTERISTICAS, ESTADOS_CARACTERISTICA, OPERADORES, PARAMETROS, PRUEBAS_NORMALIDAD,
                                      REGLAS_DECISION, CaracteristicaConfig, ConfiguracionAnalisis, CriterioMotor, Exclusion,
-                                     ReferenciaNivel, ReglaDerivacion)
+                                     ObjetoAnalisis, ReferenciaNivel, ReglaDerivacion)
+from src.motor.multi import ejecutar_todos, es_multiple, partes, resumen_por_objeto
 from src.motor.datos import ErrorDatosMotor
 from src.motor.tablas_contexto import QUE_SE_COMPARA, SIGNIFICADO, medias_por_factor, resumen_fuentes
 from src.motor import flujo
@@ -26,6 +27,19 @@ from src.motor.plantillas import fmt, fmt_p
 from src.persistencia.repositorio import ErrorRepositorio
 from src.servicios.analisis import (ErrorAnalisis, bitacora_analisis, datos_de_preparacion, derivar_version,
                                     ejecutar_analisis, guardar_configuracion, historial, nueva_configuracion)
+
+@st.cache_resource(show_spinner=False, max_entries=8)
+def _datos_prep(codigo_: str, prep_id: str):
+    """El conjunto preparado aprobado no cambia: se lee del disco una sola vez."""
+    return datos_de_preparacion(repositorio(), codigo_, prep_id)
+
+
+@st.cache_data(show_spinner=False, max_entries=16)
+def _vista_previa_calculo(codigo_: str, prep_id: str, cfg_json: str):
+    """El motor solo se recalcula cuando cambia la configuración (no en cada clic de otra pestaña)."""
+    tablas, e, _ = _datos_prep(codigo_, prep_id)
+    return ejecutar_todos(tablas, e, ConfiguracionAnalisis.from_dict(json.loads(cfg_json)), {"vista_previa": True})
+
 
 encabezado("Paso 7", "Análisis estadístico",
            "Motor determinista basado en reglas: cada decisión muestra la pregunta, la evidencia y la regla que la justifica.")
@@ -74,6 +88,36 @@ if ejecutada:
     _g = resumen_global(resultado)
     st.badge(f"Conclusión: {_g['etiqueta']}", color=_g["color"], icon=":material/fact_check:")
 
+# Varios resultados evaluados: cada uno tiene todas sus pruebas; aquí se elige cuál se mira.
+resultado_total = resultado
+PREF = ""
+if ejecutada and es_multiple(resultado_total):
+    filas_v = resumen_por_objeto(resultado_total)
+    with st.container(border=True):
+        st.markdown("#### :material/checklist: Veredicto por resultado evaluado")
+        st.caption("Cada resultado pasó por la secuencia completa de pruebas por separado. El veredicto del análisis es el del "
+                   "resultado más desfavorable.")
+        tabla(pd.DataFrame([{"Resultado evaluado": f"{f['nombre']} ({f['unidad']})", "Veredicto": f["titulo"],
+                             "No cumple en": ", ".join(f["no_cumple"]) or "—"} for f in filas_v]))
+    ids_obj = [f["id"] for f in filas_v]
+    nombres_obj = {f["id"]: f["nombre"] for f in filas_v}
+    sel_obj = st.segmented_control("Ver resultados y conclusiones de:", ids_obj, format_func=nombres_obj.get,
+                                   default=ids_obj[0], key=f"obj_sel_{clave}") or ids_obj[0]
+    resultado = next(r for r in partes(resultado_total) if r["objeto"]["id"] == sel_obj)
+    PREF = f"{sel_obj}:"
+    st.caption(f"Las pestañas «Resultados por etapa» y «Conclusiones» muestran: **{nombres_obj[sel_obj]}**.")
+
+
+@st.cache_data(show_spinner=False, max_entries=96)
+def _grafico_cache(nombre: str, huella: str, extra, _r: dict):
+    f = getattr(graficos, nombre)
+    return f(_r, extra) if extra is not None else f(_r)
+
+
+def _graf(nombre: str, extra=None):
+    """Los gráficos de un resultado ya ejecutado no cambian: se dibujan una vez y se reutilizan."""
+    return _grafico_cache(nombre, resultado["meta"].get("huella_resultado", ""), extra, resultado)
+
 t_conf, t_res, t_concl, t_red, t_inf, t_hist = st.tabs(
     [":material/tune: Configurar", ":material/query_stats: Resultados por etapa", ":material/rate_review: Conclusiones",
      ":material/fork_right: Rediseño / versión 2", ":material/picture_as_pdf: Informe PDF", ":material/history: Historial y bitácora"])
@@ -88,6 +132,83 @@ def _unidad_objeto(e, tipo: str, objeto: str, regla) -> str:
     return next((r.unidad for r in e.resultados if r.id == objeto), "")
 
 
+def _objeto_ui(e, clave_obj: str, o0: ObjetoAnalisis | None, bloqueado: bool, regla_dec: str, k) -> ObjetoAnalisis | None:
+    """Configuración propia de un resultado evaluado: regla (si es calculado), características, referencia y límites."""
+    tipo, oid = clave_obj.split("|", 1)
+    kk = lambda n: k(f"{n}_{oid}")  # noqa: E731
+    o0 = o0 or ObjetoAnalisis(tipo, oid)
+    nombre = next((r.nombre for r in e.resultados if r.id == oid), next((v.nombre for v in e.variables if v.id == oid), oid))
+    st.markdown(f"**Resultado evaluado: {nombre}** ({oid})")
+    regla = None
+    if tipo == "derivado":
+        res = next(r for r in e.resultados if r.id == oid)
+        vars_num = {v.id: f"{v.id} · {v.nombre} ({v.unidad})" for v in e.variables if v.tipo_dato in ("decimal", "entero")}
+        r0 = o0.regla or ReglaDerivacion(a=(res.dependencias + [""])[0], b=(res.dependencias + ["", ""])[1],
+                                         referencia=res.referencia_calculo)
+        lv = list(vars_num)
+        a1, a2 = st.columns(2)
+        a = a1.selectbox("Minuendo (a)", lv, format_func=vars_num.get, index=lv.index(r0.a) if r0.a in lv else 0, key=kk("ra"), disabled=bloqueado)
+        b = a2.selectbox("Sustraendo (b)", lv, format_func=vars_num.get, index=lv.index(r0.b) if r0.b in lv else min(1, len(lv) - 1),
+                         key=kk("rb"), disabled=bloqueado)
+        ref = st.text_input("Documento que aprueba la regla «a − b»", r0.referencia, key=kk("rref"), disabled=bloqueado,
+                            help="El motor solo implementa la diferencia a − b. No inventa fórmulas.")
+        apr = st.checkbox("Regla aprobada", r0.aprobada, key=kk("rapr"), disabled=bloqueado)
+        regla = ReglaDerivacion("diferencia", a, b, ref, apr)
+    unidad_obj = _unidad_objeto(e, tipo, oid, regla)
+
+    filas = []
+    for cod, (nom, impl, refc) in CARACTERISTICAS.items():
+        c = next((x for x in o0.caracteristicas if x.codigo == cod), None) or CaracteristicaConfig(cod)
+        filas.append({"codigo": cod, "Característica": nom, "Implementada": impl, "Estado": c.estado,
+                      "Justificación": c.justificacion, "Fuente": c.fuente, "Referencia": refc})
+    st.caption("Características que se exigen a este resultado (el laboratorio decide; el motor no las impone).")
+    car = st.data_editor(pd.DataFrame(filas), key=kk("car"), hide_index=True, width="stretch",
+                         disabled=bloqueado or ["codigo", "Característica", "Implementada", "Referencia"],
+                         column_config={"codigo": None, "Estado": st.column_config.SelectboxColumn(options=ESTADOS_CARACTERISTICA, required=True)})
+    caracteristicas = [CaracteristicaConfig(r["codigo"], r["Estado"], r["Justificación"] or "", r["Fuente"] or "") for _, r in car.iterrows()]
+
+    tr = {"ninguna": "Sin referencia", "valor_por_nivel": "Valor de referencia por punto",
+          "objeto_es_diferencia": "Ya es una diferencia (error/corrección): referencia 0"}
+    rtipo = st.radio("Referencia para el sesgo", list(tr), format_func=tr.get, index=list(tr).index(o0.referencia_tipo),
+                     key=kk("rt"), horizontal=True, disabled=bloqueado,
+                     help="Inestabilidad o inhomogeneidad normalmente no tienen valor de referencia: déjalo «Sin referencia» "
+                          "y no marques sesgo.")
+    refs = []
+    if rtipo == "valor_por_nivel":
+        df = pd.DataFrame([{"punto_id": p.id, "Punto": f"{fmt(p.valor_nominal)} {p.unidad}",
+                            "Valor": next((r.valor for r in o0.referencias if r.punto_id == p.id), None),
+                            "u estándar": next((r.incertidumbre for r in o0.referencias if r.punto_id == p.id), None),
+                            "Fuente": next((r.fuente for r in o0.referencias if r.punto_id == p.id), "")} for p in e.puntos])
+        ed = st.data_editor(df, key=kk("refs"), hide_index=True, width="stretch", disabled=bloqueado or ["punto_id", "Punto"],
+                            column_config={"punto_id": None, "Valor": st.column_config.NumberColumn(format="%.6g"),
+                                           "u estándar": st.column_config.NumberColumn(format="%.6g")})
+        refs = [ReferenciaNivel(r["punto_id"], None if pd.isna(r["Valor"]) else float(r["Valor"]),
+                                None if pd.isna(r["u estándar"]) else float(r["u estándar"]), r["Fuente"] or "") for _, r in ed.iterrows()]
+
+    LIMITES = [("sesgo", "abs_sesgo", "Sesgo máximo |b|"), ("repetibilidad", "s_r", "Repetibilidad máxima s_r"),
+               ("precision_intermedia", "s_I", "Reproducibilidad intralaboratorio máxima s_I"),
+               ("reproducibilidad", "s_R", "Reproducibilidad interlaboratorio máxima s_R")]
+    previos = {c.caracteristica: c for c in o0.criterios}
+    activas = {c.codigo for c in caracteristicas if c.estado in ("REQUERIDA", "SELECCIONADA")}
+    criterios = []
+    for car_cod, param, etiqueta in LIMITES:
+        c0 = previos.get(car_cod)
+        if car_cod not in activas and c0 is None:
+            continue
+        l1, l2, l3 = st.columns([2.2, 2.6, 1])
+        lim = l1.number_input(f"{etiqueta} [{unidad_obj or 'unidad'}]", min_value=0.0, value=c0.limite if c0 else None,
+                              format="%.6g", key=kk(f"lim_{car_cod}"), disabled=bloqueado, placeholder="sin límite")
+        fuente = l2.text_input("Fuente del límite", c0.fuente if c0 else "", key=kk(f"fue_{car_cod}"), disabled=bloqueado,
+                               placeholder="p. ej. procedimiento PC-07, tolerancia del cliente")
+        apr = l3.checkbox("Aprobado", c0.aprobado if c0 else False, key=kk(f"apr_{car_cod}"), disabled=bloqueado)
+        if lim is not None:
+            criterios.append(CriterioMotor(c0.id if c0 else f"{oid}-{car_cod[:3].upper()}", car_cod, param, "<=", float(lim),
+                                           unidad_obj, regla_dec, fuente, apr))
+    if not activas:
+        st.caption(":orange[Marca al menos una característica como REQUERIDA o SELECCIONADA para que aparezcan sus límites.]")
+    return ObjetoAnalisis(tipo, oid, regla, rtipo, refs, caracteristicas, criterios)
+
+
 def _formulario(cfg0: ConfiguracionAnalisis, bloqueado: bool) -> ConfiguracionAnalisis | None:
     k = lambda n: f"{n}_{clave}"  # noqa: E731
     ids_prep = [p["preparacion_id"] for p in preps] or [cfg0.preparacion_id]
@@ -96,45 +217,39 @@ def _formulario(cfg0: ConfiguracionAnalisis, bloqueado: bool) -> ConfiguracionAn
     prep_id = st.selectbox("Conjunto preparado (aprobado)", ids_prep[::-1], key=k("prep"), disabled=bloqueado,
                            index=ids_prep[::-1].index(cfg0.preparacion_id) if cfg0.preparacion_id in ids_prep else 0)
     try:
-        tablas, e, prep = datos_de_preparacion(repo, codigo, prep_id)
+        tablas, e, prep = _datos_prep(codigo, prep_id)
     except ErrorRepositorio as exc:
         st.error(str(exc))
         return None
     st.caption(f"Diseño v{prep['version_diseno']} · {prep['conteos']['incluidos_en_preparado']} mediciones incluidas · "
                f"archivo {prep['archivo_original']}")
 
+    previos_obj = {f"{o.tipo}|{o.id}": o for o in cfg0.lista_objetos()}
     with st.container(border=True):
-        st.markdown("##### :material/target: Qué se analiza")
-        tipos = {"variable": "Dato registrado", "resultado_directo": "Resultado registrado", "derivado": "Resultado calculado (regla aprobada)"}
-        tipo = st.segmented_control("Tipo de objeto", list(tipos), format_func=tipos.get, default=cfg0.objeto_tipo, key=k("tipo"),
-                                    disabled=bloqueado) or "variable"
-        regla = None
-        if tipo == "variable":
-            ops = {v.id: f"{v.id} · {v.nombre} ({v.unidad})" for v in e.variables if v.tipo_dato in ("decimal", "entero")}
-        elif tipo == "resultado_directo":
-            ops = {r.id: f"{r.id} · {r.nombre}" for r in e.resultados if r.origen == "directo" and r.ambito == "medicion"}
-        else:
-            ops = {r.id: f"{r.id} · {r.nombre}" for r in e.resultados if r.origen == "calculado" and r.ambito == "medicion"}
+        st.markdown("##### :material/target: Qué resultados se evalúan")
+        st.caption("Elige uno o varios. El motor corre **todas las pruebas por separado para cada resultado** "
+                   "(atípicos → normalidad → igualdad de varianzas → prueba → desempeño) y cada uno tiene sus propios límites.")
+        tipos_txt = {"variable": "dato registrado", "resultado_directo": "resultado registrado", "derivado": "resultado calculado"}
+        ops = {}
+        for r in e.resultados:
+            if r.ambito == "medicion":
+                ops[f"{'resultado_directo' if r.origen == 'directo' else 'derivado'}|{r.id}"] = f"{r.nombre} ({r.unidad}) · {r.id}"
+        for v in e.variables:
+            if v.tipo_dato in ("decimal", "entero"):
+                ops[f"variable|{v.id}"] = f"{v.nombre} ({v.unidad}) · {v.id} · dato"
         if not ops:
-            st.warning("El diseño no tiene objetos de este tipo.")
+            st.warning("El diseño no tiene datos ni resultados numéricos por medición.")
             return None
-        lista = list(ops)
-        objeto = st.selectbox("Objeto del análisis", lista, format_func=ops.get, key=k("obj"), disabled=bloqueado,
-                              index=lista.index(cfg0.objeto_id) if cfg0.objeto_id in lista else 0)
-        if tipo == "derivado":
-            res = next(r for r in e.resultados if r.id == objeto)
-            vars_num = {v.id: f"{v.id} · {v.nombre} ({v.unidad})" for v in e.variables if v.tipo_dato in ("decimal", "entero")}
-            r0 = cfg0.regla or ReglaDerivacion(a=(res.dependencias + [""])[0], b=(res.dependencias + ["", ""])[1],
-                                               referencia=res.referencia_calculo)
-            lv = list(vars_num)
-            a1, a2 = st.columns(2)
-            a = a1.selectbox("Minuendo (a)", lv, format_func=vars_num.get, index=lv.index(r0.a) if r0.a in lv else 0, key=k("ra"), disabled=bloqueado)
-            b = a2.selectbox("Sustraendo (b)", lv, format_func=vars_num.get, index=lv.index(r0.b) if r0.b in lv else min(1, len(lv) - 1),
-                             key=k("rb"), disabled=bloqueado)
-            ref = st.text_input("Documento que aprueba la regla «a − b»", r0.referencia, key=k("rref"), disabled=bloqueado,
-                                help="El motor solo implementa la diferencia a − b. No inventa fórmulas.")
-            apr = st.checkbox("Regla aprobada", r0.aprobada, key=k("rapr"), disabled=bloqueado)
-            regla = ReglaDerivacion("diferencia", a, b, ref, apr)
+        # Por defecto: lo ya configurado; si no, el primer resultado registrado o el primer dato (un resultado calculado
+        # necesita antes su regla aprobada).
+        defecto = ([k for k in previos_obj if k in ops]
+                   or [next((x for x in ops if x.startswith("resultado_directo|")), None)
+                       or next((x for x in ops if x.startswith("variable|")), next(iter(ops)))])
+        elegidos = st.multiselect("Resultados evaluados", list(ops), default=defecto, format_func=ops.get, key=k("objs"),
+                                  disabled=bloqueado, placeholder="Elige al menos un resultado")
+        if not elegidos:
+            st.warning("Elige al menos un resultado para evaluar.", icon=":material/target:")
+            return None
 
     with st.container(border=True):
         st.markdown("##### :material/alt_route: Verificación o validación")
@@ -143,15 +258,6 @@ def _formulario(cfg0: ConfiguracionAnalisis, bloqueado: bool) -> ConfiguracionAn
                                   format_func={"si": "Sí, validado", "no": "No"}.get, disabled=bloqueado) or ""
         modif = m2.text_input("Modificaciones al método (vacío = ninguna)", cfg0.modificaciones, key=k("mod"), disabled=bloqueado)
         docp = st.text_input("Documentación de validación previa (si existe)", cfg0.documentacion_previa, key=k("doc"), disabled=bloqueado)
-        st.caption("Características: el laboratorio decide cuáles son requeridas. El motor no las impone.")
-        filas = []
-        for cod, (nombre, impl, ref) in CARACTERISTICAS.items():
-            c = cfg0.caracteristica(cod) or CaracteristicaConfig(cod)
-            filas.append({"codigo": cod, "Característica": nombre, "Implementada": impl, "Estado": c.estado,
-                          "Justificación": c.justificacion, "Fuente": c.fuente, "Referencia": ref})
-        car = st.data_editor(pd.DataFrame(filas), key=k("car"), hide_index=True, width="stretch", disabled=bloqueado or ["codigo", "Característica", "Implementada", "Referencia"],
-                             column_config={"codigo": None, "Estado": st.column_config.SelectboxColumn(options=ESTADOS_CARACTERISTICA, required=True)})
-
     with st.container(border=True):
         st.markdown("##### :material/account_tree: Estructura del diseño")
         inter = st.toggle("Estudio interlaboratorio (ISO 5725-2: participan laboratorios distintos)", cfg0.es_interlaboratorio,
@@ -170,50 +276,22 @@ def _formulario(cfg0: ConfiguracionAnalisis, bloqueado: bool) -> ConfiguracionAn
                                 key=k("pi"), disabled=bloqueado,
                                 help="Forman las celdas: dentro de cada celda las réplicas se consideran en condiciones de repetibilidad.")
     with st.container(border=True):
-        st.markdown("##### :material/straighten: Referencia para el sesgo")
-        tr = {"ninguna": "Sin referencia", "valor_por_nivel": "Valor de referencia por punto",
-              "objeto_es_diferencia": "El objeto ya es una diferencia (error/corrección): referencia 0"}
-        rtipo = st.radio("Referencia", list(tr), format_func=tr.get, index=list(tr).index(cfg0.referencia_tipo), key=k("rt"),
-                         horizontal=True, disabled=bloqueado, label_visibility="collapsed")
-        refs = []
-        if rtipo == "valor_por_nivel":
-            df = pd.DataFrame([{"punto_id": p.id, "Punto": f"{fmt(p.valor_nominal)} {p.unidad}",
-                                "Valor": next((r.valor for r in cfg0.referencias if r.punto_id == p.id), None),
-                                "u estándar": next((r.incertidumbre for r in cfg0.referencias if r.punto_id == p.id), None),
-                                "Fuente": next((r.fuente for r in cfg0.referencias if r.punto_id == p.id), "")} for p in e.puntos])
-            ed = st.data_editor(df, key=k("refs"), hide_index=True, width="stretch", disabled=bloqueado or ["punto_id", "Punto"],
-                                column_config={"punto_id": None, "Valor": st.column_config.NumberColumn(format="%.6g"),
-                                               "u estándar": st.column_config.NumberColumn(format="%.6g")})
-            refs = [ReferenciaNivel(r["punto_id"], None if pd.isna(r["Valor"]) else float(r["Valor"]),
-                                    None if pd.isna(r["u estándar"]) else float(r["u estándar"]), r["Fuente"] or "") for _, r in ed.iterrows()]
-
-    with st.container(border=True):
-        st.markdown("##### :material/rule: Límites de aceptación del método (lo único que decide el laboratorio)")
-        st.caption("Escribe el valor máximo aceptable de cada característica. Si lo dejas vacío, esa característica se calcula "
-                   "pero no se dice si cumple («sin criterio»). No hay valores por defecto.")
-        unidad_obj = _unidad_objeto(e, tipo, objeto, regla)
-        LIMITES = [("sesgo", "abs_sesgo", "Sesgo máximo |b| (desvío promedio permitido)"),
-                   ("repetibilidad", "s_r", "Repetibilidad máxima s_r"),
-                   ("precision_intermedia", "s_I", "Precisión intermedia máxima s_I"),
-                   ("reproducibilidad", "s_R", "Reproducibilidad máxima s_R (solo interlaboratorio)")]
-        previos = {c.caracteristica: c for c in cfg0.criterios}
+        st.markdown("##### :material/rule: Características y límites de aceptación de cada resultado")
+        st.caption("Lo único que decide el laboratorio: qué se exige y el valor máximo aceptable. Si dejas un límite vacío, "
+                   "se calcula pero no se dice si cumple («sin criterio»). No hay valores por defecto.")
         regla_txt = {"estimacion": "Comparar el valor calculado con el límite",
                      "intervalo": "Exigir que todo el intervalo de confianza 95 % quede dentro del límite (más estricto)"}
+        todos_crit = [c for o in previos_obj.values() for c in o.criterios]
         regla_dec = st.radio("¿Cómo se decide si cumple?", list(regla_txt), format_func=regla_txt.get, key=k("regla_dec"),
-                             index=1 if any(c.regla_decision == "intervalo" for c in cfg0.criterios) else 0,
+                             index=1 if any(c.regla_decision == "intervalo" for c in todos_crit) else 0,
                              horizontal=True, disabled=bloqueado)
-        criterios = []
-        for car_cod, param, etiqueta in LIMITES:
-            c0 = previos.get(car_cod)
-            l1, l2, l3 = st.columns([2.2, 2.6, 1])
-            lim = l1.number_input(f"{etiqueta} [{unidad_obj or 'unidad del objeto'}]", min_value=0.0, value=c0.limite if c0 else None,
-                                  format="%.6g", key=k(f"lim_{car_cod}"), disabled=bloqueado, placeholder="sin límite")
-            fuente = l2.text_input("Fuente del límite", c0.fuente if c0 else "", key=k(f"fue_{car_cod}"), disabled=bloqueado,
-                                   placeholder="p. ej. procedimiento PC-07, tolerancia del cliente")
-            apr = l3.checkbox("Aprobado", c0.aprobado if c0 else False, key=k(f"apr_{car_cod}"), disabled=bloqueado)
-            if lim is not None:
-                criterios.append(CriterioMotor(c0.id if c0 else f"CM-{len(criterios) + 1:02d}", car_cod, param, "<=", float(lim),
-                                               unidad_obj, regla_dec, fuente, apr))
+        pestanas = st.tabs([ops[x].split(" · ")[0] for x in elegidos])
+        objetos = []
+        for pest, clave_obj in zip(pestanas, elegidos):
+            with pest:
+                o = _objeto_ui(e, clave_obj, previos_obj.get(clave_obj), bloqueado, regla_dec, k)
+                if o is not None:
+                    objetos.append(o)
 
     with st.container(border=True):
         st.markdown("##### :material/lock: Reglas estadísticas fijas (no configurables)")
@@ -225,16 +303,19 @@ def _formulario(cfg0: ConfiguracionAnalisis, bloqueado: bool) -> ConfiguracionAn
         aut = r3.text_input("Autorizador", cfg0.autorizado_por, key=k("aut"), disabled=bloqueado)
         alfa, conf, pn, alerta, edicion = 0.05, 0.95, "shapiro_wilk", None, "ISO 5725-2:1994"
 
-    caracteristicas = [CaracteristicaConfig(r["codigo"], r["Estado"], r["Justificación"] or "", r["Fuente"] or "") for _, r in car.iterrows()]
+    if not objetos:
+        return None
     datos = cfg0.to_dict()
-    datos.update(preparacion_id=prep_id, objeto_tipo=tipo, objeto_id=objeto, metodo_validado=mv, modificaciones=modif,
+    datos.update(preparacion_id=prep_id, metodo_validado=mv, modificaciones=modif,
                  documentacion_previa=docp, es_interlaboratorio=inter, factor_laboratorio=lab, factores_precision_intermedia=pi,
-                 referencia_tipo=rtipo, alfa=alfa, nivel_confianza=conf, prueba_normalidad=pn, alerta_faltantes_pct=alerta,
+                 alfa=alfa, nivel_confianza=conf, prueba_normalidad=pn, alerta_faltantes_pct=alerta,
                  version_normativa=edicion.strip(), revisado_por=rev, autorizado_por=aut)
     cfg = ConfiguracionAnalisis.from_dict(datos)
-    cfg.regla, cfg.caracteristicas, cfg.criterios, cfg.referencias = regla, caracteristicas, criterios, refs
+    cfg.objetos = objetos
+    o0 = objetos[0]          # campos del objeto único (compatibilidad con versiones anteriores)
+    cfg.objeto_tipo, cfg.objeto_id, cfg.regla = o0.tipo, o0.id, o0.regla
+    cfg.referencia_tipo, cfg.referencias, cfg.caracteristicas, cfg.criterios = o0.referencia_tipo, o0.referencias, o0.caracteristicas, o0.criterios
     cfg.exclusiones = cfg0.exclusiones
-    st.session_state[f"tablas_{clave}"] = (tablas, e, prep)
     return cfg
 
 
@@ -265,27 +346,33 @@ def _tabla_en_palabras(resultados: list[dict]) -> pd.DataFrame:
 
 
 def _vista_previa(cfg: ConfiguracionAnalisis) -> None:
-    tablas, e, prep = st.session_state[f"tablas_{clave}"]
     try:
-        r = ejecutar(tablas, e, cfg, {"vista_previa": True})
+        total = _vista_previa_calculo(codigo, cfg.preparacion_id, json.dumps(cfg.to_dict(), sort_keys=True, default=str))
     except ErrorDatosMotor as exc:
         st.error(str(exc), icon=":material/error:")
         return
     st.markdown("##### :material/bolt: Qué va a hacer el motor (se actualiza mientras configuras)")
     st.caption("Cada fila es una prueba. Si no se aplica, te decimos por qué en palabras sencillas.")
-    if not any(cfg.activa(c) for c in CARACTERISTICAS):
-        st.warning("Ninguna característica está marcada como REQUERIDA o SELECCIONADA: no se calculará desempeño.",
-                   icon=":material/checklist:")
-    df = _tabla_en_palabras(r["resultados"])
-    for etapa_txt, sub in df.groupby("Etapa", sort=False):
-        st.markdown(f"**{etapa_txt}**")
-        st.markdown("\n".join(f"- {f['¿Se aplica?']} · **{f['Prueba']}** — {f['Por qué / qué pasó']}" for _, f in sub.iterrows()))
-    with st.expander("Árbol de decisiones (pregunta → respuesta → evidencia → regla)"):
-        tabla(pd.DataFrame(r["arbol"]).rename(columns={"pregunta": "Pregunta", "respuesta": "Respuesta", "evidencia": "Evidencia", "regla": "Regla"}))
-    for aviso in r["ruta"]["avisos"]:
-        st.warning(aviso, icon=":material/alt_route:")
-    g = resumen_global(r)
-    st.info(f"Conclusión prevista: **{g['etiqueta']}** — {g['texto']}", icon=":material/visibility:")
+    subs = partes(total)
+    pest = st.tabs([f"Resultado evaluado: {r['objeto']['nombre']}" for r in subs]) if len(subs) > 1 else [st.container()]
+    for contenedor, r, o in zip(pest, subs, cfg.lista_objetos()):
+        with contenedor:
+            if not any(c.estado in ("REQUERIDA", "SELECCIONADA") for c in o.caracteristicas):
+                st.warning("Ninguna característica está marcada como REQUERIDA o SELECCIONADA para este resultado: no se calculará desempeño.",
+                           icon=":material/checklist:")
+            df = _tabla_en_palabras(r["resultados"])
+            for etapa_txt, sub in df.groupby("Etapa", sort=False):
+                st.markdown(f"**{etapa_txt}**")
+                st.markdown("\n".join(f"- {f['¿Se aplica?']} · **{f['Prueba']}** — {f['Por qué / qué pasó']}" for _, f in sub.iterrows()))
+            with st.expander("Árbol de decisiones (pregunta → respuesta → evidencia → regla)"):
+                tabla(pd.DataFrame(r["arbol"]).rename(columns={"pregunta": "Pregunta", "respuesta": "Respuesta", "evidencia": "Evidencia", "regla": "Regla"}))
+            for aviso in r["ruta"]["avisos"]:
+                st.warning(aviso, icon=":material/alt_route:")
+            g = resumen_global(r)
+            st.info(f"Conclusión prevista para **{r['objeto']['nombre']}**: **{g['etiqueta']}** — {g['texto']}", icon=":material/visibility:")
+    if len(subs) > 1:
+        g = resumen_global(total)
+        st.info(f"Conclusión prevista del análisis (el resultado más desfavorable): **{g['etiqueta']}**", icon=":material/visibility:")
 
 
 with t_conf:
@@ -313,21 +400,25 @@ with t_conf:
                     st.rerun()
                 except (ErrorAnalisis, ErrorDatosMotor, ErrorRepositorio) as exc:
                     st.error(str(exc))
-        with st.container(border=True):
-            _vista_previa(cfg_actual)
+        if not ejecutada:
+            with st.container(border=True):
+                _vista_previa(cfg_actual)
 
 
 # ------------------------------------------------------------------ 2 · resultados por etapa
 def _comentarios(etapa: str) -> None:
+    etiqueta_etapa = etapa
+    etapa = PREF + etapa
     propios = [c for c in guardado["comentarios"] if c["etapa"] == etapa]
     with st.container(border=True):
-        st.markdown(f"**:material/comment: Retroalimentación humana — {etapa}**")
+        st.markdown(f"**:material/comment: Retroalimentación humana — {etiqueta_etapa}**"
+                    + (f" · {resultado['objeto']['nombre']}" if PREF else ""))
         for c in propios:
             st.markdown(f"<small>{c['fecha'][:16].replace('T', ' ')} · **{c['usuario']}**</small><br>{c['texto']}", unsafe_allow_html=True)
         if version_sel == NUEVA:
             return
-        with st.form(f"com_{etapa}_{clave}", clear_on_submit=True, border=False):
-            txt = st.text_area("Nuevo comentario", key=f"txt_{etapa}_{clave}", height=80, placeholder="Observación técnica de esta etapa…")
+        with st.form(f"com_{etapa.replace(':', '_')}_{clave}", clear_on_submit=True, border=False):
+            txt = st.text_area("Nuevo comentario", key=f"txt_{etapa.replace(':', '_')}_{clave}", height=80, placeholder="Observación técnica de esta etapa…")
             if st.form_submit_button("Guardar comentario", icon=":material/send:") and requerir_usuario():
                 try:
                     repo.agregar_comentario(codigo, version_sel, etapa, txt, usuario())
@@ -452,7 +543,7 @@ def _bloque_prueba(tecnica: str, xs: list[dict], figs: dict) -> None:
                 pest = st.tabs([f"Media por {n.lower()}" for n in medias] + ["Gráfico de combinaciones"])
                 for pe, (n, (cab_f, filas_f)) in zip(pest, medias.items()):
                     pe.dataframe(pd.DataFrame(filas_f, columns=cab_f), hide_index=True, width="stretch")
-                fig = graficos.interaccion_grid(resultado)
+                fig = _graf("interaccion_grid")
                 if fig:
                     pest[-1].image(fig, width="stretch")
                     pest[-1].caption("Cada línea es un técnico; el eje horizontal, el patrón. Líneas paralelas = no hay interacción.")
@@ -465,16 +556,17 @@ with t_res:
     if not ejecutada:
         st.info("Ejecuta el análisis para ver los resultados por etapa.", icon=":material/play_arrow:")
     else:
+        st.markdown(f"## :material/target: Resultado evaluado: {resultado['objeto']['nombre']} ({resultado['objeto']['unidad']})")
         _veredicto_y_flujo(resultado)
         cols = st.columns(2)
-        for col, fig in zip(cols, (graficos.resumen_sesgo(resultado), graficos.resumen_precision(resultado))):
+        for col, fig in zip(cols, (_graf("resumen_sesgo"), _graf("resumen_precision"))):
             if fig:
                 col.image(fig, width="stretch")
         st.caption(f"Ejecutado {resultado['meta']['ejecutado_en'][:16].replace('T', ' ')} por {resultado['meta'].get('ejecutado_por', '—')} · "
                    f"{resultado['objeto']['descripcion']} · huella `{resultado['meta']['huella_resultado'][:12]}…`")
         figs = {}
         for etapa, nombre in ETAPAS:
-            st.markdown(f"### {nombre}")
+            st.markdown(f"### {nombre} · {resultado['objeto']['nombre']}")
             st.info(en_palabras(resultado["conclusiones"].get(etapa, "")), icon=":material/smart_toy:")
             if QUE_SE_COMPARA.get(etapa):
                 with st.expander("Qué se compara en esta etapa"):
@@ -482,13 +574,13 @@ with t_res:
             for tecnica, xs in _agrupar([x for x in resultado["resultados"] if x["etapa"] == etapa]):
                 _bloque_prueba(tecnica, xs, figs)
             if etapa == "limpieza":
-                fig = graficos.puntos_grid(resultado)
+                fig = _graf("puntos_grid")
                 if fig:
                     with st.expander("Ver los datos por punto"):
                         st.image(fig, width="stretch")
             if etapa == "normalidad":
                 for objeto in ("sesgo", "precision"):
-                    fig = graficos.qq_grid(resultado, objeto)
+                    fig = _graf("qq_grid", objeto)
                     if fig:
                         with st.expander(f"Gráficos cuantil-cuantil ({'unidades del sesgo' if objeto == 'sesgo' else 'residuos'})"):
                             st.image(fig, width="stretch")
@@ -501,7 +593,7 @@ with t_concl:
     if not ejecutada:
         st.info("Ejecuta el análisis para ver las conclusiones.", icon=":material/play_arrow:")
     else:
-        st.markdown("#### Conclusiones técnicas preliminares (automáticas)")
+        st.markdown(f"#### Conclusiones técnicas preliminares (automáticas) · resultado evaluado: {resultado['objeto']['nombre']}")
         for etapa, nombre in ETAPAS:
             st.markdown(f"**{nombre}.** {en_palabras(resultado['conclusiones'].get(etapa, ''))}")
         _veredicto_y_flujo(resultado, con_flujo=False)
@@ -510,7 +602,7 @@ with t_concl:
             st.markdown("**Evolución entre versiones del análisis**")
             tabla(pd.DataFrame([{"Versión": f"v{v['version']}", "Motivo": v["motivo_cambio"] or "—",
                                  "Cambios": "; ".join(c["campo"] for c in v["cambios"]) or "—",
-                                 "Resultado": flujo.veredicto(repo.obtener_analisis(codigo, v["version"])["resultado"])["titulo"]}
+                                 "Resultado": resumen_global(repo.obtener_analisis(codigo, v["version"])["resultado"])["etiqueta"]}
                                 for v in hist]))
         tabla(pd.DataFrame([{"Característica": f["caracteristica"], "Configuración": f["estado_configurado"], "Ejecución": f["ejecucion"],
                              "Decisión": f["decision"], "Referencia": f["referencia"]} for f in resultado["caracteristicas"]]))
@@ -528,11 +620,12 @@ with t_red:
                  "Después podrás modificar parámetros y criterios en **Configurar** y volver a ejecutar.")
         sugeridos = []
         if ejecutada:
-            for r in resultado["resultados"]:
-                for f in r.get("tabla", []):
-                    if f.get("clasificacion") in ("rezagado (*)", "atípico (**)") and f.get("medicion_id"):
-                        sugeridos.append(f["medicion_id"])
-            ids = [d["medicion_id"] for d in resultado["datos"]]
+            for parte in partes(resultado_total):
+                for r in parte["resultados"]:
+                    for f in r.get("tabla", []):
+                        if f.get("clasificacion") in ("rezagado (*)", "atípico (**)") and f.get("medicion_id") not in sugeridos:
+                            sugeridos.append(f["medicion_id"])
+            ids = sorted({d["medicion_id"] for parte in partes(resultado_total) for d in parte["datos"]})
         else:
             ids = []
         with st.form(f"red_{clave}"):
@@ -574,15 +667,15 @@ with t_inf:
             generar = st.form_submit_button("Generar informe PDF", type="primary", icon=":material/picture_as_pdf:")
         if generar and requerir_usuario():
             from src.informes.pdf import generar_informe
-            estudio_v, _ = repo.obtener_version(codigo, resultado["meta"]["version_diseno"])
+            estudio_v, _ = repo.obtener_version(codigo, resultado_total["meta"]["version_diseno"])
             control = {"fecha": fecha.isoformat(), "elaborado_por": elab, "revisado_por": rev, "autorizado_por": aut}
             with st.spinner("Generando informe…"):
                 from src.servicios import reporte_limpieza
                 try:
-                    limp = reporte_limpieza.construir(repo, codigo, guardado["config"]["preparacion_id"], resultado)
+                    limp = reporte_limpieza.construir(repo, codigo, guardado["config"]["preparacion_id"], partes(resultado_total)[0])
                 except Exception:  # noqa: BLE001 - el informe sale aunque falte la carga original
                     limp = None
-                pdf = generar_informe(resultado, guardado["config"], estudio_v, guardado["comentarios"], historial(repo, codigo),
+                pdf = generar_informe(resultado_total, guardado["config"], estudio_v, guardado["comentarios"], historial(repo, codigo),
                                       bitacora_analisis(repo, codigo), control, limp)
             nombre = repo.guardar_informe(codigo, version_sel, pdf, {**control, "emitido_por": usuario(), "sha256": sha256_bytes(pdf),
                                                                      "fecha": fecha.isoformat()})

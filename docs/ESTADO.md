@@ -1,6 +1,6 @@
 # Estado del desarrollo
 
-Comprobado el 2026-11-01 con 127 pruebas automatizadas (todas aprobadas), pruebas de humo de cada página, instalación limpia en un entorno nuevo y recorrido real en navegador (incluidos el análisis y la emisión del PDF).
+Comprobado el 2026-11-01 con 128 pruebas automatizadas (todas aprobadas), pruebas de humo de cada página, instalación limpia en un entorno nuevo y recorrido real en navegador (incluidos el análisis y la emisión del PDF).
 
 ## Terminado y comprobado
 
@@ -20,7 +20,7 @@ Comprobado el 2026-11-01 con 127 pruebas automatizadas (todas aprobadas), prueba
 | 4 · Ingesta | Conservación del original y su SHA-256. Identificación de estudio, versión y huella. Columnas por encabezado (tolera reordenar filas). Historial de cargas con diferencias | test_ingesta |
 | 5 · Calidad | 20 reglas, estados por registro, conteos conciliados, mensajes con hoja, fila y celda, 4 transformaciones autorizables, exclusiones con motivo, informe de incidencias en Excel | test_calidad, test_preparacion |
 | 6 · Exportación | ZIP SAL-1.0 con tablas normalizadas, manifiesto con huellas, salida reproducible byte a byte, lector Python que verifica integridad, aprobación del conjunto (X07) | test_preparacion, ejemplos/ |
-| 7 · Pruebas | 127 pruebas, también en GitHub Actions | `07_pruebas.md` |
+| 7 · Pruebas | 128 pruebas, también en GitHub Actions | `07_pruebas.md` |
 | 9 · Motor | Etapas, reglas, tablas ISO verificadas contra fórmula, anexo B.1, 4 escenarios y casos adversos | test_motor |
 | 10 · Informe | Versionado, comentarios, clonación, PDF leído en la prueba | test_analisis_servicio, test_interfaz |
 | 8 · Documentación | Insumos técnicos en `docs/` (4 generados desde el código) | — |
@@ -28,6 +28,8 @@ Comprobado el 2026-11-01 con 127 pruebas automatizadas (todas aprobadas), prueba
 **Testeos, limpieza y lenguaje sencillo (3.2):** Testeo 1–4 se crean solos al abrir la app desde `data/estudios_prueba/` (una vez por carpeta de datos). Reporte de limpieza en pantalla y en PDF: pasos, 20 reglas con sus hallazgos, transformaciones autorizadas y aplicadas, exclusiones, lo que nunca se hace y herramientas. Cada prueba explica en palabras sencillas qué hace y por qué se aplicó o no (`src/motor/lenguaje.py`). Informe PDF con portada, resumen para todos, gráficos de resumen y tablas con color.
 
 **Versión 4.0:** selección de estudios con tarjetas en Inicio y panel integrado; bases de prueba con 5 lecturas por serie y errores sembrados (240 mediciones, 4 escenarios con su resultado esperado comprobado en `test_crear_estudios_de_prueba`); ANOVA factorial de fuentes de variación (técnico, patrón, interacción) con contribución porcentual, medias por factor y gráfico de combinaciones; revisión de réplicas por serie frente al plan; parámetros de las pruebas de hipótesis fijos (RM-24) y solo límites de aceptación configurables; «cumple con observaciones» cuando se rechaza la normalidad (RM-25); informe con tabla de significado metrológico y «qué se compara» en cada etapa.
+
+**Versión 6.0 (varios resultados evaluados y rendimiento):** en «Configurar» se eligen uno o varios resultados (por ejemplo corrección, inestabilidad e inhomogeneidad). El motor corre la secuencia **completa** por separado para cada uno (limpieza → atípicos → normalidad → homocedasticidad → prueba correspondiente → desempeño → criterios): cada resultado tiene sus propias características, referencia, límites y veredicto, y el veredicto del análisis es el del más desfavorable (`src/motor/multi.py`). Pantalla, conclusiones y PDF dicen siempre «Resultado evaluado: …». Los Testeo 1–4 evalúan los tres resultados (la inestabilidad y la inhomogeneidad no tienen referencia, así que se evalúan su repetibilidad y su reproducibilidad intralaboratorio, con límites de prueba en `criterios_prueba.json`). Rendimiento: la vista previa ya no recalcula el motor en cada clic (solo cuando cambia la configuración y nunca en versiones ejecutadas), el conjunto preparado y los gráficos se leen/dibujan una vez, y Tukey HSD se calcula directamente (antes statsmodels buscaba el valor crítico por integración numérica). Crear los 4 testeos con 3 resultados tarda ~17 s frente a ~33 s antes con uno solo; la página de análisis responde en ~0,6–0,8 s por interacción.
 
 **Versión 5.1 (árbol corregido):** con datos no normales ya no se aplica ningún ANOVA: ni ANOVA clásico, ni de Welch, ni prueba F de s_I, ni intervalos χ²; la comparación va directo a Kruskal-Wallis + Dunn-Holm y la homocedasticidad (Bartlett) solo se evalúa —y solo decide— cuando hay normalidad (Fligner-Killeen queda como dato informativo). Árbol en `diagramas/arbol_decision.png`.
 

@@ -165,14 +165,26 @@ def _dunn(datos: dict) -> list[dict]:
 
 
 def _tukey(datos: dict, alfa: float) -> list[dict]:
-    from statsmodels.stats.multicomp import pairwise_tukeyhsd
-    y = np.concatenate([np.asarray(v, float) for v in datos.values()])
-    g = np.concatenate([[k] * len(v) for k, v in datos.items()])
-    r = pairwise_tukeyhsd(y, g, alpha=alfa)
+    """Tukey HSD (Tukey-Kramer para grupos desiguales): q = |ȳa − ȳb| / √(MSE/2 · (1/na + 1/nb)), p con la distribución
+    del rango estudentizado (k grupos, N − k gl). Se calcula solo el valor p de cada par; no hace falta el valor crítico
+    (Tukey, 1949; Kramer, 1956)."""
+    claves = list(datos)
+    xs = [np.asarray(datos[c], float) for c in claves]
+    k, N = len(xs), sum(len(x) for x in xs)
+    gl = N - k
+    mse = sum(((x - x.mean()) ** 2).sum() for x in xs) / gl if gl > 0 else np.nan
     salida = []
-    for fila in r.summary().data[1:]:
-        a, b, dif, p = str(fila[0]), str(fila[1]), float(fila[2]), float(fila[3])
-        salida.append({"a": b, "b": a, "diferencia": dif, "p": p})   # dif = media(b_tabla) − media(a_tabla)
+    for (ia, a), (ib, b) in itertools.combinations(enumerate(claves), 2):
+        xa, xb = xs[ia], xs[ib]
+        dif = float(xa.mean() - xb.mean())
+        se = np.sqrt(mse / 2 * (1 / len(xa) + 1 / len(xb))) if gl > 0 else np.nan
+        if not np.isfinite(se):
+            p = None
+        elif se == 0:
+            p = 0.0 if dif != 0 else 1.0
+        else:
+            p = float(min(1.0, stats.studentized_range.sf(abs(dif) / se, k, gl)))
+        salida.append({"a": a, "b": b, "diferencia": dif, "p": p})
     return salida
 
 
@@ -239,7 +251,7 @@ def ejecutar(ctx: Contexto) -> None:
             metodo = {"anova": "Tukey HSD", "welch": "Games-Howell", "kruskal": "Dunn-Holm"}[ruta]
             for par in pares:
                 posthoc.append({"factor": f["fuente"], "metodo": metodo, "comparacion": f"{par['a']} vs {par['b']}",
-                                "diferencia": par["diferencia"], "p": par["p"], "significativa": par["p"] < cfg.alfa})
+                                "diferencia": par["diferencia"], "p": par["p"], "significativa": par["p"] is not None and par["p"] < cfg.alfa})
         influyen = [f["fuente"] for f in filas if f.get("influye")]
         donde = [x for x in posthoc if x["significativa"]]
         ctxt = contexto_por_factor(g, activos)

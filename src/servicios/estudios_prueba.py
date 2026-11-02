@@ -24,7 +24,8 @@ from openpyxl import load_workbook
 
 from src.modelos.estudio import (Estudio, Factor, Magnitud, MedicionPlanificada, Punto, Recurso, ResultadoInteres,
                                  Variable)
-from src.motor.configuracion import CaracteristicaConfig
+from src.motor.configuracion import CaracteristicaConfig, ObjetoAnalisis
+from src.motor.multi import partes
 from src.persistencia.repositorio import Repositorio
 from src.plantillas.diligenciar import diligenciar_plantilla
 from src.plantillas.generador import generar_plantilla
@@ -163,38 +164,58 @@ def crear_estudio_desde_archivo(repo: Repositorio, contenido: bytes, nombre_arch
     aprobar_conjunto(repo, e.codigo, prep["preparacion_id"], usuario)
     salida = {"codigo": e.codigo, "nombre": nombre, "mediciones": len(e.plan), "conteos": prep["conteos"], "analisis": None}
 
-    correccion = next((r for r in e.resultados if r.nombre.lower().startswith("correcci") and r.origen == "directo"), None)
-    if correccion is not None:
+    # Se evalúan TODOS los resultados registrados por medición (corrección, inestabilidad, inhomogeneidad…),
+    # cada uno con su secuencia completa de pruebas y sus propios límites.
+    registrados = [r for r in e.resultados if r.origen == "directo" and r.ambito == "medicion"]
+    if registrados:
         cfg = nueva_configuracion(repo, e.codigo, prep["preparacion_id"], usuario)
-        cfg.objeto_tipo, cfg.objeto_id = "resultado_directo", correccion.id
         cfg.metodo_validado = "si" if e.tipo.lower().startswith("verif") else "no"
         cfg.factores_precision_intermedia = [f.id for f in e.factores]
-        cfg.referencia_tipo = "objeto_es_diferencia"
-        cfg.caracteristicas = [CaracteristicaConfig("sesgo", "REQUERIDA"), CaracteristicaConfig("repetibilidad", "REQUERIDA"),
-                               CaracteristicaConfig("precision_intermedia", "REQUERIDA")]
-        cfg.criterios = criterios_de_prueba()
-        cfg.motivo_cambio = ("Configuración inicial con los criterios de prueba de las bases sintéticas." if cfg.criterios
-                             else "Configuración inicial sin criterios (los define el laboratorio).")
+        cfg.objetos = [objeto_de_prueba(r) for r in registrados]
+        cfg.objeto_tipo, cfg.objeto_id = "resultado_directo", registrados[0].id
+        cfg.motivo_cambio = ("Configuración inicial con los criterios de prueba de las bases sintéticas."
+                             if any(o.criterios for o in cfg.objetos) else "Configuración inicial sin criterios (los define el laboratorio).")
         if ejecutar:
             r = ejecutar_analisis(repo, cfg, usuario)
             salida["analisis"] = r["conclusion_final"]["estado"]
+            salida["por_resultado"] = {x["objeto"]["nombre"]: x["conclusion_final"]["estado"] for x in partes(r)}
         else:
             repo.guardar_config_analisis(e.codigo, cfg.to_dict())
     return salida
 
 
-ETIQUETA = "[bases v2]"
+ETIQUETA = "[bases v3]"
 
 
-def criterios_de_prueba() -> list:
-    """Criterios del archivo criterios_prueba.json (solo para las bases sintéticas)."""
+def _es_correccion(nombre: str) -> bool:
+    return nombre.lower().startswith(("correcci", "error"))
+
+
+def criterios_de_prueba(resultado: str = "Corrección") -> list:
+    """Criterios del archivo criterios_prueba.json (solo para las bases sintéticas), por resultado evaluado."""
     from src.motor.configuracion import CriterioMotor
     ruta = CARPETA_PRUEBAS / "criterios_prueba.json"
     if not ruta.exists():
         return []
-    datos = json.loads(ruta.read_text(encoding="utf-8")).get("criterios", {})
-    return [CriterioMotor(f"CP-{i:02d}", car, c["parametro"], "<=", float(c["limite"]), c["unidad"], "estimacion", c["fuente"], True)
+    js = json.loads(ruta.read_text(encoding="utf-8"))
+    datos = js.get("criterios", {}) if _es_correccion(resultado) else js.get("criterios_por_resultado", {}).get(resultado, {})
+    pref = "".join(ch for ch in resultado.upper() if ch.isalpha())[:3] or "CP"
+    return [CriterioMotor(f"{pref}-{i:02d}", car, c["parametro"], "<=", float(c["limite"]), c["unidad"], "estimacion", c["fuente"], True)
             for i, (car, c) in enumerate(datos.items(), start=1)]
+
+
+def objeto_de_prueba(r: ResultadoInteres) -> ObjetoAnalisis:
+    """La corrección es un error frente al patrón: se evalúan sesgo (referencia 0), repetibilidad y reproducibilidad
+    intralaboratorio. Inestabilidad e inhomogeneidad no tienen valor de referencia: se evalúan su repetibilidad y su
+    reproducibilidad intralaboratorio (y de qué condición dependen)."""
+    if _es_correccion(r.nombre):
+        cars = ["sesgo", "repetibilidad", "precision_intermedia"]
+        ref = "objeto_es_diferencia"
+    else:
+        cars = ["repetibilidad", "precision_intermedia"]
+        ref = "ninguna"
+    return ObjetoAnalisis("resultado_directo", r.id, None, ref, [], [CaracteristicaConfig(c, "REQUERIDA") for c in cars],
+                          criterios_de_prueba(r.nombre))
 
 
 ESCENARIOS = {

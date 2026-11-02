@@ -66,7 +66,7 @@ def ejecutar(tablas: dict, e: Estudio, cfg: ConfiguracionAnalisis, meta: dict | 
         if len(obs.excluidas) else [],
         "reglas": matriz(),
     }
-    if not (meta or {}).get("sensibilidad") and len(obs.df):
+    if not (meta or {}).get("sensibilidad") and not (meta or {}).get("vista_previa") and len(obs.df):
         salida["sensibilidad"] = sensibilidad(tablas, e, cfg, ctx, salida)
     salida = limpio(salida)
     salida["meta"]["huella_resultado"] = sha256_bytes(json_canonico({k: v for k, v in salida.items() if k != "meta"}).encode())
