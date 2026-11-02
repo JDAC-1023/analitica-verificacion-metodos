@@ -95,6 +95,7 @@ def ruido(n: int, normal: bool, s: float, rng) -> np.ndarray:
 
 def valores(e: Estudio, p: dict) -> pd.DataFrame:
     rng = np.random.default_rng(p["semilla"])
+    rng2 = np.random.default_rng(p["semilla"] + 1000)   # inestabilidad e inhomogeneidad (no altera la corrección)
     tec = dict(zip([t for t, _ in TECNICOS], p["tec"]))
     pat = dict(zip([c for c, _ in PATRONES], p["pat"]))
     filas = []
@@ -105,12 +106,16 @@ def valores(e: Estudio, p: dict) -> pd.DataFrame:
         nominal = e.punto(pid).valor_nominal
         sesgo_punto = p["sesgo"] + rng.normal(0, 0.003)
         eps = ruido(len(ms), p["normal"], p["s"], rng)
-        for m, err in zip(ms, eps):
+        # Inestabilidad e inhomogeneidad siguen la misma forma de distribución que el escenario (normal o asimétrica).
+        inest = 0.03 + ruido(len(ms), p["normal"], 0.008, rng2)
+        inhom = 0.04 + ruido(len(ms), p["normal"], 0.010, rng2)
+        for m, err, r2, r3 in zip(ms, eps, inest, inhom):
             patron = round(nominal + rng.normal(0, 0.004), 3)
             correccion = sesgo_punto + tec[m.tecnico] + pat[m.patron] + err
+            rng.normal(0.03, 0.008), rng.normal(0.04, 0.01)   # se conservan las extracciones de la versión anterior
             filas.append({"medicion_id": m.medicion_id, "var:V-01": round(patron - correccion, 3), "var:V-02": patron,
                           "res:R-01": round(patron - round(patron - correccion, 3), 3),
-                          "res:R-02": round(abs(rng.normal(0.03, 0.008)), 3), "res:R-03": round(abs(rng.normal(0.04, 0.01)), 3),
+                          "res:R-02": round(float(r2), 4), "res:R-03": round(float(r3), 4),
                           "tecnico_real": m.tecnico, "patron_real": m.patron, "hora_real": None,
                           "observaciones": "DATOS SINTÉTICOS — PRUEBA DE MOTOR; NO VÁLIDOS COMO RESULTADOS DE CALIBRACIÓN"})
     return pd.DataFrame(filas, dtype=object)
@@ -142,10 +147,17 @@ def sembrar_errores(df: pd.DataFrame, anomalo: bool, magnitud: float = 0.15) -> 
     return errores
 
 
+# Inestabilidad e inhomogeneidad no tienen valor de referencia: se evalúan su repetibilidad y reproducibilidad intralaboratorio.
+CRITERIOS_POR_RESULTADO = {
+    "Inestabilidad": {"repetibilidad": ("s_r", 0.02), "precision_intermedia": ("s_I", 0.025)},
+    "Inhomogeneidad": {"repetibilidad": ("s_r", 0.025), "precision_intermedia": ("s_I", 0.03)},
+}
+
+
 def main() -> None:
     CARPETA.mkdir(parents=True, exist_ok=True)
     anterior = CARPETA / "version_anterior_2_replicas"
-    viejos = [f for f in CARPETA.glob("*.xlsx")]
+    viejos = [f for f in CARPETA.glob("*.xlsx") if f.stem not in ESCENARIOS]   # las bases actuales se reescriben
     if viejos:
         anterior.mkdir(exist_ok=True)
         for f in viejos:
@@ -154,6 +166,8 @@ def main() -> None:
     plantilla = generar_plantilla(e)
     registro = {"diseno": f"{len(PUNTOS)} temperaturas × {len(TECNICOS)} técnicos × {len(PATRONES)} patrones × {REPLICAS} lecturas",
                 "criterios": {k: {"parametro": v[0], "limite": v[1], "unidad": "°C", "fuente": FUENTE} for k, v in CRITERIOS.items()},
+                "criterios_por_resultado": {res: {k: {"parametro": v[0], "limite": v[1], "unidad": "°C", "fuente": FUENTE}
+                                                  for k, v in crit.items()} for res, crit in CRITERIOS_POR_RESULTADO.items()},
                 "escenarios": {}}
     for nombre, p in ESCENARIOS.items():
         df = valores(e, p)

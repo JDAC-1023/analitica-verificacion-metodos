@@ -13,7 +13,7 @@ from src.auditoria.huella import ahora_iso
 from src.exportacion.lector_salida import cargar_conjunto
 from src.modelos.estudio import Estudio
 from src.motor.configuracion import ConfiguracionAnalisis, Exclusion, diferencias
-from src.motor.motor import ejecutar
+from src.motor.multi import ejecutar_todos
 from src.persistencia.repositorio import Repositorio
 
 
@@ -46,8 +46,8 @@ def guardar_configuracion(repo: Repositorio, cfg: ConfiguracionAnalisis, usuario
 def ejecutar_analisis(repo: Repositorio, cfg: ConfiguracionAnalisis, usuario: str) -> dict:
     if not cfg.preparacion_id:
         raise ErrorAnalisis("Elige el conjunto preparado que se va a analizar.")
-    if not cfg.objeto_id:
-        raise ErrorAnalisis("Elige el dato o resultado que se va a analizar.")
+    if not cfg.lista_objetos():
+        raise ErrorAnalisis("Elige al menos un resultado para evaluar.")
     tablas, estudio, prep = datos_de_preparacion(repo, cfg.codigo_estudio, cfg.preparacion_id)
     if not prep.get("aprobada"):
         raise ErrorAnalisis("El conjunto preparado no está aprobado: apruébalo en «Datos preparados» antes de analizar.")
@@ -56,7 +56,7 @@ def ejecutar_analisis(repo: Repositorio, cfg: ConfiguracionAnalisis, usuario: st
     meta = {"preparacion_id": prep["preparacion_id"], "carga_id": prep.get("carga_id"), "sha256_original": prep.get("sha256_original"),
             "archivo_original": prep.get("archivo_original"), "huella_diseno": prep.get("huella_diseno"),
             "conjunto_aprobado_por": prep.get("aprobada_por"), "ejecutado_por": usuario}
-    resultado = ejecutar(tablas, estudio, cfg, meta)
+    resultado = ejecutar_todos(tablas, estudio, cfg, meta)
     repo.guardar_resultado_analisis(cfg.codigo_estudio, cfg.version, resultado)
     repo.registrar_evento(cfg.codigo_estudio, usuario, "analisis_ejecutado",
                           {"version": cfg.version, "huella_resultado": resultado["meta"]["huella_resultado"],

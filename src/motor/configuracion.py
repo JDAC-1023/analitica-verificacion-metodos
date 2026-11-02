@@ -105,6 +105,27 @@ class ReglaDerivacion:
 
 
 @dataclass
+class ObjetoAnalisis:
+    """Un resultado que se evalúa. Con varios objetos, el motor corre TODAS las pruebas por separado para cada uno."""
+    tipo: str = "resultado_directo"      # variable | resultado_directo | derivado
+    id: str = ""
+    regla: ReglaDerivacion | None = None
+    referencia_tipo: str = "ninguna"
+    referencias: list[ReferenciaNivel] = field(default_factory=list)
+    caracteristicas: list[CaracteristicaConfig] = field(default_factory=list)
+    criterios: list[CriterioMotor] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "ObjetoAnalisis":
+        o = _desde(cls, d)
+        o.regla = _desde(ReglaDerivacion, d["regla"]) if d.get("regla") else None
+        o.referencias = [_desde(ReferenciaNivel, x) for x in d.get("referencias", [])]
+        o.caracteristicas = [_desde(CaracteristicaConfig, x) for x in d.get("caracteristicas", [])]
+        o.criterios = [_desde(CriterioMotor, x) for x in d.get("criterios", [])]
+        return o
+
+
+@dataclass
 class ConfiguracionAnalisis:
     codigo_estudio: str
     version: int = 1
@@ -140,6 +161,8 @@ class ConfiguracionAnalisis:
     revisado_por: str = ""
     autorizado_por: str = ""
     creado_en: str = ""
+    # resultados evaluados (si está vacío se usa el objeto único de arriba: compatibilidad con versiones anteriores)
+    objetos: list[ObjetoAnalisis] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -152,6 +175,26 @@ class ConfiguracionAnalisis:
         c.referencias = [_desde(ReferenciaNivel, x) for x in d.get("referencias", [])]
         c.exclusiones = [_desde(Exclusion, x) for x in d.get("exclusiones", [])]
         c.criterios = [_desde(CriterioMotor, x) for x in d.get("criterios", [])]
+        c.objetos = [ObjetoAnalisis.from_dict(x) for x in d.get("objetos", [])]
+        return c
+
+    def lista_objetos(self) -> list[ObjetoAnalisis]:
+        """Resultados que se evalúan, cada uno con sus características, referencia y límites."""
+        if self.objetos:
+            return list(self.objetos)
+        if not self.objeto_id:
+            return []
+        return [ObjetoAnalisis(self.objeto_tipo, self.objeto_id, self.regla, self.referencia_tipo, list(self.referencias),
+                               list(self.caracteristicas), list(self.criterios))]
+
+    def para_objeto(self, o: ObjetoAnalisis) -> "ConfiguracionAnalisis":
+        """Configuración de un solo resultado: lo común (estructura, reglas fijas, exclusiones) + lo propio del resultado."""
+        d = self.to_dict()
+        d["objetos"] = []
+        c = ConfiguracionAnalisis.from_dict(d)
+        c.objeto_tipo, c.objeto_id, c.regla = o.tipo, o.id, o.regla
+        c.referencia_tipo, c.referencias = o.referencia_tipo, list(o.referencias)
+        c.caracteristicas, c.criterios = list(o.caracteristicas), list(o.criterios)
         return c
 
     def caracteristica(self, codigo: str) -> CaracteristicaConfig | None:

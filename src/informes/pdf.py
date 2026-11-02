@@ -26,6 +26,7 @@ from reportlab.platypus import (BaseDocTemplate, CondPageBreak, Frame, Image, Ke
 
 from src.modelos.estudio import Estudio
 from src.motor import flujo, graficos
+from src.motor.multi import partes, resumen_por_objeto
 from src.motor.lenguaje import DECISION, GLOBAL, en_palabras, explicar, hallazgos, que_hace
 from src.motor.plantillas import fmt, fmt_p
 from src.motor.referencias import CITAS, FUNDAMENTOS, REFERENCIAS
@@ -299,6 +300,19 @@ def fundamentos_usados(resultado: dict) -> list[str]:
     return usados + (["criterios"] if "criterios" not in usados else [])
 
 
+def _fundamentos_todos(subs: list[dict]) -> list[str]:
+    usados = []
+    for x in subs:
+        usados += [c for c in fundamentos_usados(x) if c not in usados]
+    return usados
+
+
+def _configs(config: dict, subs: list[dict]) -> list[dict]:
+    """Configuración propia de cada resultado evaluado (criterios), en el mismo orden que los resultados."""
+    objetos = {o["id"]: o for o in config.get("objetos", [])}
+    return [objetos.get(x["objeto"]["id"], config) for x in subs]
+
+
 def _pruebas_en_palabras(resultado: dict) -> Table:
     """Una fila por técnica y estado: ¿se aplicó?, en cuántos grupos y por qué."""
     grupos = {}
@@ -416,9 +430,12 @@ def generar_informe(resultado: dict, config: dict, estudio: Estudio, comentarios
     tipo = (final.get("tipo") or estudio.tipo or "estudio").lower()
     veredicto, tono_final = GLOBAL.get(final["estado"], (final["estado"], "gray"))
     obj = resultado["objeto"]
+    subs = partes(resultado)
+    multi = len(subs) > 1
+    total = resultado
     buf = io.BytesIO()
     doc = _Doc(buf, {"kicker": f"Informe técnico de {tipo}", "titulo": estudio.nombre,
-                     "subtitulo": f"{estudio.metodo or ''} · objeto analizado: {obj['nombre']} ({obj['unidad']})".strip(" ·"),
+                     "subtitulo": f"{estudio.metodo or ''} · {'resultados evaluados' if multi else 'resultado evaluado'}: {obj['nombre']} ({obj['unidad']})".strip(" ·"),
                      "veredicto": veredicto, "tono": tono_final, "elaborado_por": control.get("elaborado_por"),
                      "linea_1": f"{meta['estudio']} · diseño v{meta['version_diseno']} · análisis v{meta['version_analisis']}",
                      "linea_2": f"Emitido {control.get('fecha', '')}"},
@@ -448,34 +465,52 @@ def generar_informe(resultado: dict, config: dict, estudio: Estudio, comentarios
 
     # ---------- 1. resumen para todos
     h += seccion("1", "Resumen en lenguaje sencillo", "Para cualquier lector: qué se evaluó, qué se encontró y qué significa")
-    v = flujo.veredicto(resultado)
-    h.append(caja(v["texto"], v["titulo"], {"green": "green", "red": "red", "orange": "orange"}.get(v["color"], "gray")))
-    h.append(Spacer(1, 6))
-    h += _paso_a_paso(resultado)
-    cab_m, filas_m = flujo.mapa(resultado)
-    if filas_m:
-        h += [CondPageBreak(5 * cm), P("Desempeño punto por punto (✔ cumple · ✘ no cumple · · sin criterio)", "h3"),
-              tabla([cab_m] + filas_m, [2 * cm] + [(ANCHO - 2 * cm) / (len(cab_m) - 1)] * (len(cab_m) - 1))]
-    h += _implicaciones(resultado)
-    h.append(Spacer(1, 6))
-    caracts = [x for x in resultado["caracteristicas"] if x["estado_configurado"] in ("REQUERIDA", "SELECCIONADA")]
-    if caracts:
-        items = []
-        for x in caracts[:4]:
-            d = DECISION.get(x["decision"], (x["decision"].replace("_", " ").capitalize(), "", "gray", ""))
-            items.append((d[0], x["caracteristica"], d[2]))
-        h.append(kpis(items))
+    def _resumen(resultado: dict, cfg_r: dict) -> list:
+        h = []
+        v = flujo.veredicto(resultado)
+        h.append(caja(v["texto"], v["titulo"], {"green": "green", "red": "red", "orange": "orange"}.get(v["color"], "gray")))
         h.append(Spacer(1, 6))
-    limite = next((c["limite"] for c in config.get("criterios", []) if c["caracteristica"] == "sesgo" and c["aprobado"]
-                   and c["parametro"] == "abs_sesgo" and c["limite"] is not None), None)
-    for fig in (graficos.resumen_sesgo(resultado, limite), graficos.resumen_precision(resultado)):
-        if fig:
-            h += [imagen(fig, 16.5), Spacer(1, 4)]
+        h += _paso_a_paso(resultado)
+        cab_m, filas_m = flujo.mapa(resultado)
+        if filas_m:
+            h += [CondPageBreak(5 * cm), P("Desempeño punto por punto (✔ cumple · ✘ no cumple · · sin criterio)", "h3"),
+                  tabla([cab_m] + filas_m, [2 * cm] + [(ANCHO - 2 * cm) / (len(cab_m) - 1)] * (len(cab_m) - 1))]
+        h += _implicaciones(resultado)
+        h.append(Spacer(1, 6))
+        caracts = [x for x in resultado["caracteristicas"] if x["estado_configurado"] in ("REQUERIDA", "SELECCIONADA")]
+        if caracts:
+            items = []
+            for x in caracts[:4]:
+                d = DECISION.get(x["decision"], (x["decision"].replace("_", " ").capitalize(), "", "gray", ""))
+                items.append((d[0], x["caracteristica"], d[2]))
+            h.append(kpis(items))
+            h.append(Spacer(1, 6))
+        limite = next((c["limite"] for c in cfg_r.get("criterios", []) if c["caracteristica"] == "sesgo" and c["aprobado"]
+                       and c["parametro"] == "abs_sesgo" and c["limite"] is not None), None)
+        for fig in (graficos.resumen_sesgo(resultado, limite), graficos.resumen_precision(resultado)):
+            if fig:
+                h += [imagen(fig, 16.5), Spacer(1, 4)]
+        h += [CondPageBreak(7 * cm), P("Qué pruebas se aplicaron y cuáles no (y por qué)", "h3"), _pruebas_en_palabras(resultado)]
+
+        return h
+
+    if multi:
+        h.append(P("Veredicto por resultado evaluado", "h3"))
+        h.append(P("Cada resultado pasó por la secuencia completa de pruebas por separado (atípicos → normalidad → igualdad de "
+                   "varianzas → prueba correspondiente → desempeño). El veredicto del análisis es el del resultado más desfavorable.", "nota"))
+        h.append(tabla([["Resultado evaluado", "Veredicto", "No cumple en"]] +
+                       [[f"{f['nombre']} ({f['unidad']})", pastilla(f["titulo"].replace("TU MÉTODO ", "").capitalize(),
+                                                                       {"green": "green", "red": "red", "orange": "orange"}.get(f["color"], "gray"), 5.2 * cm),
+                         ", ".join(f["no_cumple"]) or "—"] for f in resumen_por_objeto(total)],
+                       [5 * cm, 5.6 * cm, ANCHO - 10.6 * cm]))
+        h.append(Spacer(1, 8))
+    for k_obj, (sub, cfg_r) in enumerate(zip(subs, _configs(config, subs)), start=1):
+        if multi:
+            h += [CondPageBreak(8 * cm), P(f"1.{k_obj}  Resultado evaluado: {sub['objeto']['nombre']} ({sub['objeto']['unidad']})", "h2")]
+        h += _resumen(sub, cfg_r)
     h.append(P("Qué significa cada parámetro (significado metrológico)", "h3"))
     h.append(tabla([["Parámetro", "Qué es", "Qué significa para el método", "Referencia"]] + [list(x) for x in SIGNIFICADO],
                    [3.2 * cm, 4.6 * cm, 6.2 * cm, ANCHO - 14 * cm]))
-    h += [CondPageBreak(7 * cm), P("Qué pruebas se aplicaron y cuáles no (y por qué)", "h3"), _pruebas_en_palabras(resultado)]
-
     # ---------- 2. limpieza
     h += [CondPageBreak(10 * cm)] + seccion("2", "Reporte de limpieza de datos", "Qué se revisó, qué se encontró, qué se hizo y con qué herramienta")
     if limpieza:
@@ -491,126 +526,151 @@ def generar_informe(resultado: dict, config: dict, estudio: Estudio, comentarios
              ["Patrones", "; ".join(f"{r.codigo} {r.nombre}" for r in estudio.patrones) or "—"],
              ["Condiciones del diseño", "; ".join(f"{x.nombre}" for x in estudio.factores) or "—"],
              ["Mediciones planificadas", str(len(estudio.plan))],
-             ["Ruta", f"Declarada: {resultado['ruta']['declarada']} · sugerida por el estado del método: {resultado['ruta']['sugerida'] or 'no determinable'} (Eurachem, 2016, §4.2)"]]
+             ["Ruta", f"Declarada: {subs[0]['ruta']['declarada']} · sugerida por el estado del método: {subs[0]['ruta']['sugerida'] or 'no determinable'} (Eurachem, 2016, §4.2)"],
+             ["Resultados evaluados", "; ".join(f"{x['objeto']['nombre']} ({x['objeto']['unidad']}) · {x['objeto']['descripcion']}" for x in subs)]]
     h.append(tabla(filas, [4.4 * cm, ANCHO - 4.4 * cm]))
-    for aviso in resultado["ruta"]["avisos"]:
+    for aviso in sorted({a for x in subs for a in x["ruta"]["avisos"]}):
         h += [Spacer(1, 4), caja(aviso, "Observación sobre la ruta", "orange")]
     h.append(P("Fundamento de las pruebas aplicadas", "h2"))
-    for clave in fundamentos_usados(resultado):
+    for clave in _fundamentos_todos(subs):
         fu = FUNDAMENTOS[clave]
         h.append(KeepTogether([P(fu["titulo"], "h3"), P(fu["texto"]), P("Fuentes: (" + "; ".join(CITAS[k] for k in fu["refs"]) + ").", "nota")]))
 
     # ---------- 4. resultados por etapa
     h += [PageBreak()] + seccion("4", "Resultados por etapa", "Conclusión automática, explicación sencilla, detalle técnico y comentarios del revisor")
-    for n, etapa in enumerate(("limpieza", "atipicos", "normalidad", "homocedasticidad", "desempeno"), start=1):
-        h += [CondPageBreak(6 * cm), P(f"4.{n}  {NOMBRE_ETAPA[etapa]}", "h2"),
-              caja(en_palabras(resultado["conclusiones"].get(etapa, "")), "Conclusión preliminar (automática)")]
-        rs = [x for x in resultado["resultados"] if x["etapa"] == etapa]
-        comp = QUE_SE_COMPARA.get(etapa)
-        if comp:
-            h += [P("Qué se compara en esta etapa", "h3"), tabla([["Elemento", "Qué se compara", "Con qué"]] + comp,
-                                                                  [3.6 * cm, 6.8 * cm, ANCHO - 10.4 * cm]), Spacer(1, 4)]
-        if etapa == "desempeno":
-            for car, titulo in (("sesgo", "Sesgo"), ("repetibilidad", "Repetibilidad"), ("precision_intermedia", "Reproducibilidad intralaboratorio (precisión intermedia)"),
-                                ("reproducibilidad", "Reproducibilidad interlaboratorio")):
-                bloque = _tabla_desempeno(resultado, car)
-                if bloque:
-                    h += [P(titulo, "h3"), P(que_hace(titulo), "nota")] + bloque
-                    ej = next((r for r in rs if r["caracteristica"] == car and r["estado"] == "APLICABLE"), None)
+    def _etapas(resultado: dict, num: str, pref: str) -> list:
+        h = []
+        for n, etapa in enumerate(("limpieza", "atipicos", "normalidad", "homocedasticidad", "desempeno"), start=1):
+            h += [CondPageBreak(6 * cm), P(f"{num}{n}  {NOMBRE_ETAPA[etapa]}" + (f" · {resultado['objeto']['nombre']}" if multi else ""), "h2" if not multi else "h3"),
+                  caja(en_palabras(resultado["conclusiones"].get(etapa, "")), "Conclusión preliminar (automática)")]
+            rs = [x for x in resultado["resultados"] if x["etapa"] == etapa]
+            comp = QUE_SE_COMPARA.get(etapa)
+            if comp:
+                h += [P("Qué se compara en esta etapa", "h3"), tabla([["Elemento", "Qué se compara", "Con qué"]] + comp,
+                                                                      [3.6 * cm, 6.8 * cm, ANCHO - 10.4 * cm]), Spacer(1, 4)]
+            if etapa == "desempeno":
+                for car, titulo in (("sesgo", "Sesgo"), ("repetibilidad", "Repetibilidad"), ("precision_intermedia", "Reproducibilidad intralaboratorio (precisión intermedia)"),
+                                    ("reproducibilidad", "Reproducibilidad interlaboratorio")):
+                    bloque = _tabla_desempeno(resultado, car)
+                    if bloque:
+                        h += [P(titulo, "h3"), P(que_hace(titulo), "nota")] + bloque
+                        ej = next((r for r in rs if r["caracteristica"] == car and r["estado"] == "APLICABLE"), None)
+                        if ej:
+                            h.append(P("Ejemplo en palabras: " + explicar(ej)["explicacion"], "nota"))
+                cab, filas_fv = resumen_fuentes(resultado)
+                if filas_fv:
+                    h += [CondPageBreak(7 * cm), P("Fuentes de variación: ¿depende el resultado del técnico o del patrón?", "h3"),
+                          P(que_hace("Fuentes de variación") + " ✱ = influye significativamente (p < 0,05). El porcentaje es la parte de la "
+                            "variación total que explica cada fuente; el resto es repetibilidad (residual).", "nota"),
+                          tabla([cab] + filas_fv, [1.8 * cm] + [(ANCHO - 1.8 * cm - 3.6 * cm) / (len(cab) - 2)] * (len(cab) - 2) + [3.6 * cm])]
+                    for nombre_f, (cab_f, filas_f) in medias_por_factor(resultado).items():
+                        h += [Spacer(1, 4), KeepTogether([P(f"{resultado['objeto']['nombre']} media por {nombre_f.lower()} en cada punto ({resultado['objeto']['unidad']})", "h3"),
+                              tabla([cab_f] + filas_f, [1.8 * cm] + [(ANCHO - 1.8 * cm) / (len(cab_f) - 1)] * (len(cab_f) - 1))])]
+                    fig = graficos.interaccion_grid(resultado)
+                    if fig:
+                        h += [Spacer(1, 4), P("Medias por combinación en cada punto (líneas paralelas = sin interacción)", "h3"), imagen(fig, 16.5)]
+                    h += _donde(resultado)
+                    ej = cruce(resultado)
                     if ej:
-                        h.append(P("Ejemplo en palabras: " + explicar(ej)["explicacion"], "nota"))
-            cab, filas_fv = resumen_fuentes(resultado)
-            if filas_fv:
-                h += [CondPageBreak(7 * cm), P("Fuentes de variación: ¿depende el resultado del técnico o del patrón?", "h3"),
-                      P(que_hace("Fuentes de variación") + " ✱ = influye significativamente (p < 0,05). El porcentaje es la parte de la "
-                        "variación total que explica cada fuente; el resto es repetibilidad (residual).", "nota"),
-                      tabla([cab] + filas_fv, [1.8 * cm] + [(ANCHO - 1.8 * cm - 3.6 * cm) / (len(cab) - 2)] * (len(cab) - 2) + [3.6 * cm])]
-                for nombre_f, (cab_f, filas_f) in medias_por_factor(resultado).items():
-                    h += [Spacer(1, 4), KeepTogether([P(f"{resultado['objeto']['nombre']} media por {nombre_f.lower()} en cada punto ({resultado['objeto']['unidad']})", "h3"),
-                          tabla([cab_f] + filas_f, [1.8 * cm] + [(ANCHO - 1.8 * cm) / (len(cab_f) - 1)] * (len(cab_f) - 1))])]
-                fig = graficos.interaccion_grid(resultado)
-                if fig:
-                    h += [Spacer(1, 4), P("Medias por combinación en cada punto (líneas paralelas = sin interacción)", "h3"), imagen(fig, 16.5)]
-                h += _donde(resultado)
-                ej = cruce(resultado)
-                if ej:
-                    h += [Spacer(1, 4), P(f"Ejemplo de tabla cruzada en {ej[0]} (media por combinación)", "h3"),
-                          tabla([ej[1]] + ej[2], [4 * cm] + [(ANCHO - 4 * cm) / (len(ej[1]) - 1)] * (len(ej[1]) - 1))]
-            lims = sorted({l for r in rs for l in r.get("limitaciones", [])})
-            if lims:
-                h += [P("Advertencias técnicas", "h3")] + [P("•  " + l, "pl") for l in lims[:12]]
-        elif etapa == "normalidad":
-            aplic = [r for r in rs if r["estado"] == "APLICABLE"]
-            if aplic:
-                h.append(tabla([["Punto", "Qué se revisó", "Estadístico", "p", "En palabras"]] +
-                               [[r["agrupacion"].replace("nivel ", "").split(" · ")[0],
-                                 "unidades del sesgo" if "sesgo" in r["agrupacion"] else "residuos (precisión)",
-                                 f"{r['estadistico']['simbolo']} = {fmt(r['estadistico']['valor'])}", fmt_p(r["p_valor"]),
-                                 pastilla("No normal" if r["decision_inferencial"] == "Se rechaza H0" else "Compatible con normal",
-                                          "orange" if r["decision_inferencial"] == "Se rechaza H0" else "green", 3.2 * cm)] for r in aplic],
-                               [2.2 * cm, 3.6 * cm, 3 * cm, 1.8 * cm, ANCHO - 10.6 * cm]))
-                for obj_n in ("sesgo", "precision"):
-                    fig = graficos.qq_grid(resultado, obj_n)
+                        h += [Spacer(1, 4), P(f"Ejemplo de tabla cruzada en {ej[0]} (media por combinación)", "h3"),
+                              tabla([ej[1]] + ej[2], [4 * cm] + [(ANCHO - 4 * cm) / (len(ej[1]) - 1)] * (len(ej[1]) - 1))]
+                lims = sorted({l for r in rs for l in r.get("limitaciones", [])})
+                if lims:
+                    h += [P("Advertencias técnicas", "h3")] + [P("•  " + l, "pl") for l in lims[:12]]
+            elif etapa == "normalidad":
+                aplic = [r for r in rs if r["estado"] == "APLICABLE"]
+                if aplic:
+                    h.append(tabla([["Punto", "Qué se revisó", "Estadístico", "p", "En palabras"]] +
+                                   [[r["agrupacion"].replace("nivel ", "").split(" · ")[0],
+                                     "unidades del sesgo" if "sesgo" in r["agrupacion"] else "residuos (precisión)",
+                                     f"{r['estadistico']['simbolo']} = {fmt(r['estadistico']['valor'])}", fmt_p(r["p_valor"]),
+                                     pastilla("No normal" if r["decision_inferencial"] == "Se rechaza H0" else "Compatible con normal",
+                                              "orange" if r["decision_inferencial"] == "Se rechaza H0" else "green", 3.2 * cm)] for r in aplic],
+                                   [2.2 * cm, 3.6 * cm, 3 * cm, 1.8 * cm, ANCHO - 10.6 * cm]))
+                    for obj_n in ("sesgo", "precision"):
+                        fig = graficos.qq_grid(resultado, obj_n)
+                        if fig:
+                            h += [Spacer(1, 6), imagen(fig, 16.5)]
+                for r in [r for r in rs if r["estado"] != "APLICABLE"][:3]:
+                    ex = explicar(r)
+                    h.append(caja(ex["explicacion"], f"{r['tecnica']}: {ex['estado']}", "gray"))
+            else:
+                filas = [["Prueba", "Grupo", "Estado", "En palabras sencillas"]]
+                for r in rs:
+                    ex = explicar(r)
+                    filas.append([r["tecnica"], r["agrupacion"], pastilla(ex["estado"], ex["color"], 2.4 * cm),
+                                  ex["explicacion"] + (f" Qué haría falta: {ex['que_hacer']}" if ex["que_hacer"] else "")])
+                h.append(tabla(filas, [3.2 * cm, 3.4 * cm, 2.6 * cm, ANCHO - 9.2 * cm]))
+                if etapa == "limpieza":
+                    fig = graficos.puntos_grid(resultado)
                     if fig:
                         h += [Spacer(1, 6), imagen(fig, 16.5)]
-            for r in [r for r in rs if r["estado"] != "APLICABLE"][:3]:
-                ex = explicar(r)
-                h.append(caja(ex["explicacion"], f"{r['tecnica']}: {ex['estado']}", "gray"))
+                for r in rs:
+                    if r["estado"] == "APLICABLE" and r["tecnica"].startswith(("Cochran", "Grubbs (medias", "Mandel")):
+                        h += [P(f"{r['tecnica']} — {r['agrupacion']}", "h3"), P(r.get("texto") or "")]
+                        for g in r.get("graficos", []):
+                            png = graficos.mandel(resultado, g.split(":")[1], g[7]) if g.startswith("mandel") else None
+                            if png:
+                                h.append(imagen(png, 15))
+            h.append(P("Comentarios del revisor", "h3"))
+            if coment.get(pref + etapa):
+                h.append(tabla([["Fecha", "Usuario", "Comentario"]] + [[c["fecha"][:16].replace("T", " "), c["usuario"], c["texto"]] for c in coment[pref + etapa]],
+                               [3 * cm, 3 * cm, ANCHO - 6 * cm]))
+            else:
+                h.append(P("Sin comentarios registrados en esta etapa.", "nota"))
+
+        return h
+
+    for k_obj, sub in enumerate(subs, start=1):
+        if multi:
+            h += [CondPageBreak(8 * cm), P(f"4.{k_obj}  Resultado evaluado: {sub['objeto']['nombre']} ({sub['objeto']['unidad']})", "h2")]
+            h += _etapas(sub, f"4.{k_obj}.", f"{sub['objeto']['id']}:")
         else:
-            filas = [["Prueba", "Grupo", "Estado", "En palabras sencillas"]]
-            for r in rs:
-                ex = explicar(r)
-                filas.append([r["tecnica"], r["agrupacion"], pastilla(ex["estado"], ex["color"], 2.4 * cm),
-                              ex["explicacion"] + (f" Qué haría falta: {ex['que_hacer']}" if ex["que_hacer"] else "")])
-            h.append(tabla(filas, [3.2 * cm, 3.4 * cm, 2.6 * cm, ANCHO - 9.2 * cm]))
-            if etapa == "limpieza":
-                fig = graficos.puntos_grid(resultado)
-                if fig:
-                    h += [Spacer(1, 6), imagen(fig, 16.5)]
-            for r in rs:
-                if r["estado"] == "APLICABLE" and r["tecnica"].startswith(("Cochran", "Grubbs (medias", "Mandel")):
-                    h += [P(f"{r['tecnica']} — {r['agrupacion']}", "h3"), P(r.get("texto") or "")]
-                    for g in r.get("graficos", []):
-                        png = graficos.mandel(resultado, g.split(":")[1], g[7]) if g.startswith("mandel") else None
-                        if png:
-                            h.append(imagen(png, 15))
-        h.append(P("Comentarios del revisor", "h3"))
-        if coment.get(etapa):
-            h.append(tabla([["Fecha", "Usuario", "Comentario"]] + [[c["fecha"][:16].replace("T", " "), c["usuario"], c["texto"]] for c in coment[etapa]],
-                           [3 * cm, 3 * cm, ANCHO - 6 * cm]))
-        else:
-            h.append(P("Sin comentarios registrados en esta etapa.", "nota"))
+            h += _etapas(sub, "4.", "")
 
     # ---------- 5. consolidado y conclusiones
     h += [PageBreak()] + seccion("5", "Evaluación frente a criterios y conclusiones finales", "Cumplimiento consolidado según ISO 5725 y Eurachem")
-    filas = [["Característica", "¿Se pidió?", "¿Se calculó?", "Decisión", "Referencia"]]
-    for x in resultado["caracteristicas"]:
-        if x["estado_configurado"] in ("PENDIENTE", "NO_SOLICITADA") and not x["niveles"]:
-            continue
-        d = DECISION.get(x["decision"], (x["decision"].replace("_", " ").capitalize(), "", "gray", ""))
-        filas.append([x["caracteristica"], x["estado_configurado"].capitalize(), "Sí" if x["ejecucion"] == "APLICABLE" else x["ejecucion"].replace("_", " ").capitalize(),
-                      pastilla(d[0], d[2], 2.7 * cm), x["referencia"]])
-    h.append(tabla(filas, [4.2 * cm, 2.3 * cm, 2.6 * cm, 3.1 * cm, ANCHO - 12.2 * cm]))
-    crits = config.get("criterios", [])
-    h.append(P("Criterios de aceptación aplicados", "h3"))
-    if crits:
-        h.append(tabla([["Id", "Característica", "Requisito", "Regla", "Fuente", "Aprobado"]] +
-                       [[c["id"], c["caracteristica"], f"{c['parametro']} {c['operador']} {fmt(c['limite'])} {c['unidad']}",
-                         c["regla_decision"] or "—", c["fuente"] or "—", "Sí" if c["aprobado"] else "No"] for c in crits]))
-    else:
-        h.append(caja("El laboratorio no ha definido criterios de aceptación para este análisis. Por eso los resultados se presentan "
-                      "como «calculados sin criterio»: no se declara cumplimiento ni incumplimiento.", "Sin criterios", "orange"))
-    vf = flujo.veredicto(resultado)
-    h += [Spacer(1, 8), caja(vf["texto"] + " " + resultado["conclusiones"]["conclusion_final"], f"Conclusión técnica final: {vf['titulo']}",
-                             {"green": "green", "red": "red", "orange": "orange"}.get(vf["color"], "gray"))]
-    h += _implicaciones(resultado)
-    if coment.get("conclusiones"):
+    def _consolidado(resultado: dict, cfg_r: dict) -> list:
+        h = []
+        filas = [["Característica", "¿Se pidió?", "¿Se calculó?", "Decisión", "Referencia"]]
+        for x in resultado["caracteristicas"]:
+            if x["estado_configurado"] in ("PENDIENTE", "NO_SOLICITADA") and not x["niveles"]:
+                continue
+            d = DECISION.get(x["decision"], (x["decision"].replace("_", " ").capitalize(), "", "gray", ""))
+            filas.append([x["caracteristica"], x["estado_configurado"].capitalize(), "Sí" if x["ejecucion"] == "APLICABLE" else x["ejecucion"].replace("_", " ").capitalize(),
+                          pastilla(d[0], d[2], 2.7 * cm), x["referencia"]])
+        h.append(tabla(filas, [4.2 * cm, 2.3 * cm, 2.6 * cm, 3.1 * cm, ANCHO - 12.2 * cm]))
+        crits = cfg_r.get("criterios", [])
+        h.append(P("Criterios de aceptación aplicados", "h3"))
+        if crits:
+            h.append(tabla([["Id", "Característica", "Requisito", "Regla", "Fuente", "Aprobado"]] +
+                           [[c["id"], c["caracteristica"], f"{c['parametro']} {c['operador']} {fmt(c['limite'])} {c['unidad']}",
+                             c["regla_decision"] or "—", c["fuente"] or "—", "Sí" if c["aprobado"] else "No"] for c in crits]))
+        else:
+            h.append(caja("El laboratorio no ha definido criterios de aceptación para este análisis. Por eso los resultados se presentan "
+                          "como «calculados sin criterio»: no se declara cumplimiento ni incumplimiento.", "Sin criterios", "orange"))
+        vf = flujo.veredicto(resultado)
+        h += [Spacer(1, 8), caja(vf["texto"] + " " + resultado["conclusiones"]["conclusion_final"], (f"Conclusión técnica final · {resultado['objeto']['nombre']}: " if multi else "Conclusión técnica final: ") + vf["titulo"],
+                                 {"green": "green", "red": "red", "orange": "orange"}.get(vf["color"], "gray"))]
+        h += _implicaciones(resultado)
+        return h
+
+    for k_obj, (sub, cfg_r) in enumerate(zip(subs, _configs(config, subs)), start=1):
+        if multi:
+            h += [CondPageBreak(8 * cm), P(f"5.{k_obj}  Resultado evaluado: {sub['objeto']['nombre']} ({sub['objeto']['unidad']})", "h2")]
+        h += _consolidado(sub, cfg_r)
+    if multi:
+        g_txt, g_tono = GLOBAL.get(total["conclusion_final"]["estado"], (total["conclusion_final"]["estado"], "gray"))
+        h += [Spacer(1, 8), caja(total["conclusion_final"]["texto"], f"Conclusión del análisis completo: {g_txt}",
+                                 {"green": "green", "red": "red", "orange": "orange"}.get(g_tono, "gray"))]
+    obs_concl = [c for k_c, cs in coment.items() if k_c.split(":")[-1] == "conclusiones" for c in cs]
+    if obs_concl:
         h += [P("Observaciones del revisor", "h3"), tabla([["Fecha", "Usuario", "Comentario"]] +
-                                                          [[c["fecha"][:16].replace("T", " "), c["usuario"], c["texto"]] for c in coment["conclusiones"]],
+                                                          [[c["fecha"][:16].replace("T", " "), c["usuario"], (f"[{c['etapa'].split(':')[0]}] " if ":" in c["etapa"] else "") + c["texto"]] for c in obs_concl],
                                                           [3 * cm, 3 * cm, ANCHO - 6 * cm])]
     h.append(P("Una diferencia estadísticamente significativa no equivale a incumplir, ni una no significativa a cumplir: "
                "la decisión se toma solo frente al criterio aprobado.", "nota"))
-    lims = sorted({l for r in resultado["resultados"] for l in r.get("limitaciones", [])})
+    lims = sorted({(f"{x['objeto']['nombre']}: " if multi else "") + l for x in subs for r in x["resultados"] for l in r.get("limitaciones", [])})
     h.append(P("Limitaciones", "h2"))
     h += [P("•  " + l, "pl") for l in lims] or [P("Sin limitaciones registradas.")]
 
@@ -626,24 +686,28 @@ def generar_informe(resultado: dict, config: dict, estudio: Estudio, comentarios
                                                      [[b["fecha"][:16].replace("T", " "), b["usuario"], b["accion"].replace("_", " "),
                                                        str(b.get("detalle") or "")[:140]] for b in bitacora[-50:]],
                                                      [2.8 * cm, 3 * cm, 3.4 * cm, ANCHO - 9.2 * cm])]
-    h += [P("Árbol de decisiones del motor", "h3"),
-          tabla([["#", "Pregunta", "Respuesta", "Evidencia", "Regla"]] +
-                [[str(i + 1), n["pregunta"], n["respuesta"], n["evidencia"], n["regla"]] for i, n in enumerate(resultado["arbol"])],
-                [0.8 * cm, 5.4 * cm, 2.2 * cm, 7 * cm, ANCHO - 15.4 * cm])]
+    for sub in subs:
+        h += [P("Árbol de decisiones del motor" + (f" · {sub['objeto']['nombre']}" if multi else ""), "h3"),
+              tabla([["#", "Pregunta", "Respuesta", "Evidencia", "Regla"]] +
+                    [[str(i + 1), n["pregunta"], n["respuesta"], n["evidencia"], n["regla"]] for i, n in enumerate(sub["arbol"])],
+                    [0.8 * cm, 5.4 * cm, 2.2 * cm, 7 * cm, ANCHO - 15.4 * cm])]
 
     # ---------- referencias y anexos
-    usadas = sorted({k for c in fundamentos_usados(resultado) for k in FUNDAMENTOS[c]["refs"]}
+    usadas = sorted({k for c in _fundamentos_todos(subs) for k in FUNDAMENTOS[c]["refs"]}
                     | {"iso5725_1", "iso5725_2", "eurachem", "vim", "iso17025", "scipy"}
                     | ({"ema_cenam", "sae"} if tipo.startswith("verif") else set()), key=lambda k: REFERENCIAS[k])
     h += [PageBreak()] + seccion("R", "Referencias", "Formato APA 7")
     h += [Paragraph(esc(REFERENCIAS[k]), E["ref"]) for k in usadas]
     h += [PageBreak()] + seccion("A", "Anexo A · Datos analizados", "Valores tal como se analizaron, sin redondeo adicional")
-    h.append(tabla([["Medición", "Punto", "Grupo de condiciones", "Valor"]] +
-                   [[d["medicion_id"], d["punto"], d["celda"], repr(d["valor"])] for d in resultado["datos"]],
-                   [2.4 * cm, 5.6 * cm, 5.6 * cm, ANCHO - 13.6 * cm]))
-    if resultado["excluidas"]:
-        h += [P("Mediciones excluidas", "h3"), tabla([["Medición", "Grupo", "Valor", "Motivo"]] +
-                                                    [[x["medicion_id"], x["celda"], repr(x["valor"]), x["motivo"]] for x in resultado["excluidas"]])]
+    for sub in subs:
+        if multi:
+            h.append(P(f"Resultado evaluado: {sub['objeto']['nombre']} ({sub['objeto']['unidad']})", "h3"))
+        h.append(tabla([["Medición", "Punto", "Grupo de condiciones", "Valor"]] +
+                       [[d["medicion_id"], d["punto"], d["celda"], repr(d["valor"])] for d in sub["datos"]],
+                       [2.4 * cm, 5.6 * cm, 5.6 * cm, ANCHO - 13.6 * cm]))
+        if sub["excluidas"]:
+            h += [P("Mediciones excluidas", "h3"), tabla([["Medición", "Grupo", "Valor", "Motivo"]] +
+                                                        [[x["medicion_id"], x["celda"], repr(x["valor"]), x["motivo"]] for x in sub["excluidas"]])]
     h += [PageBreak()] + seccion("B", "Anexo B · Matriz de reglas del motor", "NORMA = exigido por la norma · COMPLEMENTARIA = buena práctica · CRITERIO_LAB = decisión del laboratorio")
     h.append(tabla([["Regla", "Descripción", "Origen", "Referencia"]] +
                    [[r["codigo"], r["descripcion"], r["origen"], r["referencia"]] for r in resultado["reglas"]],

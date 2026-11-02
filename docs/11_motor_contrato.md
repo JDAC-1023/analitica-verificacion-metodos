@@ -8,7 +8,8 @@ La matriz describe el diseño y la ingesta, pero no trae lo necesario para decid
 
 | Campo nuevo | Para qué | Si falta |
 | --- | --- | --- |
-| `objeto_tipo`, `objeto_id` | Qué se analiza: un dato (V-xx), un resultado registrado (R-xx) o un resultado calculado | No se ejecuta |
+| `objetos[]` (tipo, id, regla, referencia, características y criterios de cada uno) | **Qué resultados se evalúan.** Con varios, el motor corre todas las pruebas por separado para cada uno y el veredicto global es el más desfavorable | No se ejecuta |
+| `objeto_tipo`, `objeto_id` | Objeto único de versiones anteriores (se sigue leyendo; equivale a `objetos` con un elemento) | — |
 | `regla` (a − b, referencia, aprobada) | Única derivación implementada; la matriz solo da dependencias (V05) y referencia (V06), no la fórmula | Error: el motor no inventa fórmulas |
 | `metodo_validado`, `modificaciones`, `documentacion_previa` | Ruta verificación / validación (Eurachem §4.2) | Ruta «no determinable», aviso |
 | `caracteristicas[]` (REQUERIDA / SELECCIONADA / NO_APLICABLE_JUSTIFICADA / PENDIENTE, justificación, fuente) | Qué se evalúa. El laboratorio decide | No se calcula desempeño |
@@ -75,7 +76,11 @@ Campos de la memoria (§10) por resultado: `analysis_id, etapa, tecnica, study_i
 - Fuera del rango de las tablas el valor se calcula por fórmula y se declara en `criticos.origen`.
 - El anexo B.1 se reproduce: s_r y s_R de la tabla B.5 a tres decimales; con los estadísticos redondeados de B.2/B.3 se obtienen m̂ = 0,69044, s_r² = 0,0002322, s_r = 0,01524 y s_R = 0,02632; Cochran señala al laboratorio 5 en el nivel 3 como rezagado; Grubbs doble señala a los laboratorios 3 y 6 en el nivel 2.
 
-## 6. Límites conocidos de esta versión
+## 6. Varios resultados evaluados
+
+`multi.ejecutar_todos` llama a `motor.ejecutar` una vez por objeto con `cfg.para_objeto(o)`: lo común (conjunto, estructura, factores, reglas fijas, exclusiones) más lo propio del resultado. Ninguna decisión se comparte entre resultados. El `resultado.json` queda con `multi: true`, `objetos[]` (un resultado completo por objeto, con su huella) y `conclusion_final` combinada (orden NO_CONFORME → INDETERMINADO → INCOMPLETO → CALCULADO_SIN_EVALUACION → SIN_ALCANCE → CONFORME_CON_OBSERVACIONES → CONFORME). `multi.partes()` devuelve la lista de resultados (también para análisis antiguos de un solo objeto).
+
+## 7. Límites conocidos de esta versión
 
 - Solo derivación «a − b». Otras fórmulas requieren una regla aprobada nueva en código.
 - Para estimar s_I los factores se combinan en un único factor; su efecto por separado se prueba en «Fuentes de variación».

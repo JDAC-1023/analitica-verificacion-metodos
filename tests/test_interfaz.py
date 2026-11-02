@@ -141,7 +141,8 @@ def test_pagina_analisis_con_configuracion(entorno, ejecutado):
     at.run()
     assert not at.exception, [x.value for x in at.exception]
     textos = " ".join(m.value for m in at.markdown)
-    assert "Qué va a hacer el motor" in textos and "Paso a paso del motor" in textos if ejecutado else "Qué va a hacer el motor" in textos
+    # ejecutada: se muestra lo guardado (sin recalcular la vista previa); sin ejecutar: la vista previa en vivo
+    assert ("Paso a paso del motor" in textos and "Resultado evaluado" in textos) if ejecutado else "Qué va a hacer el motor" in textos
     if ejecutado:
         assert any("Conclusión consolidada" in b.label for b in at.get("badge")) if at.get("badge") else True
         boton = next(b for b in at.button if b.label == "Generar informe PDF")

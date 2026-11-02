@@ -1,5 +1,7 @@
 # Cómo incorporar esta entrega (Windows · PowerShell)
 
+> **Actualización 6.0:** varios resultados evaluados (corrección, inestabilidad, inhomogeneidad…), cada uno con **todas** sus pruebas por separado, sus propios límites y su veredicto; en pantalla y en el PDF siempre dice «Resultado evaluado: …». La app es bastante más rápida (la vista previa ya no recalcula en cada clic). Los Testeo 1–4 se vuelven a crear con los tres resultados; los anteriores quedan renombrados «(bases anteriores)».
+>
 > **Actualización 5.1:** árbol de decisión corregido: sin normalidad no se aplica ningún ANOVA (ni Welch, ni prueba F, ni intervalos χ²); Bartlett solo con normalidad. Documentación y capturas actualizadas (`docs/`, `docs/capturas/`, `docs/diagramas/arbol_decision.png`).
 >
 > **Actualización 5.0:** flujo de decisión paso a paso (atípicos → normalidad → homocedasticidad → prueba correspondiente), dónde están las diferencias y por qué, reproducibilidad intralaboratorio, veredicto «tu método sirve / no sirve» con qué implica y qué hacer.
@@ -25,11 +27,11 @@ cd C:\ruta\a\analitica-verificacion-metodos
 git switch prototipo-alejandra
 git status                                          # que no haya cambios pendientes que te importen
 
-Expand-Archive -Path "$HOME\Downloads\entrega_v5_1_arbol_corregido.zip" -DestinationPath . -Force
+Expand-Archive -Path "$HOME\Downloads\entrega_v6_varios_resultados.zip" -DestinationPath . -Force
 
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt           # instala las 5 librerías nuevas
-python -m pytest -q                                 # deben pasar 127 pruebas
+python -m pytest -q                                 # deben pasar 128 pruebas
 streamlit run app.py
 ```
 

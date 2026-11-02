@@ -20,6 +20,36 @@
       "fuente": "Criterio de prueba del prototipo (datos sintéticos; no es un requisito del laboratorio)"
     }
   },
+  "criterios_por_resultado": {
+    "Inestabilidad": {
+      "repetibilidad": {
+        "parametro": "s_r",
+        "limite": 0.02,
+        "unidad": "°C",
+        "fuente": "Criterio de prueba del prototipo (datos sintéticos; no es un requisito del laboratorio)"
+      },
+      "precision_intermedia": {
+        "parametro": "s_I",
+        "limite": 0.025,
+        "unidad": "°C",
+        "fuente": "Criterio de prueba del prototipo (datos sintéticos; no es un requisito del laboratorio)"
+      }
+    },
+    "Inhomogeneidad": {
+      "repetibilidad": {
+        "parametro": "s_r",
+        "limite": 0.025,
+        "unidad": "°C",
+        "fuente": "Criterio de prueba del prototipo (datos sintéticos; no es un requisito del laboratorio)"
+      },
+      "precision_intermedia": {
+        "parametro": "s_I",
+        "limite": 0.03,
+        "unidad": "°C",
+        "fuente": "Criterio de prueba del prototipo (datos sintéticos; no es un requisito del laboratorio)"
+      }
+    }
+  },
   "escenarios": {
     "01_Normal_No_Cumple": {
       "errores": [
