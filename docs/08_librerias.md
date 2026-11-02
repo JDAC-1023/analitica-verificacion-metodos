@@ -1,6 +1,6 @@
 # Librerías utilizadas
 
-> Versiones leídas del entorno real con `importlib.metadata` el 2026-11-01 18:46 · Python 3.13.18 · Linux.
+> Versiones leídas del entorno real con `importlib.metadata` el 2026-11-01 19:08 · Python 3.13.18 · Linux.
 
 | Librería | Versión instalada | Propósito | Componente | Justificación |
 | --- | --- | --- | --- | --- |

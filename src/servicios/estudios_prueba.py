@@ -213,10 +213,29 @@ def escenario(archivo: str) -> tuple[int, str]:
     return int(m.group(1)), ESCENARIOS.get(m.group(1), Path(archivo).stem)
 
 
+def archivos_de_prueba(carpeta: Path) -> list[Path]:
+    """Un archivo por escenario. Si existe criterios_prueba.json, se usan exactamente los archivos que lista;
+    así, copias viejas que hayan quedado en la carpeta (p. ej. «01_…_3_Variables.xlsx») no crean estudios duplicados."""
+    indice = carpeta / "criterios_prueba.json"
+    if indice.exists():
+        nombres = list(json.loads(indice.read_text(encoding="utf-8")).get("escenarios", {}))
+        elegidos = [carpeta / f"{n}.xlsx" for n in nombres if (carpeta / f"{n}.xlsx").exists()]
+        if elegidos:
+            return elegidos
+    por_numero: dict[int, Path] = {}
+    for a in sorted(carpeta.glob("*.xlsx")):
+        try:
+            n, _ = escenario(a.name)
+        except ErrorImportacion:
+            continue
+        por_numero.setdefault(n, a)
+    return [por_numero[n] for n in sorted(por_numero)]
+
+
 def crear_estudios_prueba(repo: Repositorio, usuario: str, carpeta: Path | None = None) -> list[dict]:
     """Crea «Testeo 1» … «Testeo 4» desde data/estudios_prueba si aún no existen."""
     carpeta = Path(carpeta or CARPETA_PRUEBAS)
-    archivos = sorted(carpeta.glob("*.xlsx"))
+    archivos = archivos_de_prueba(carpeta)
     if not archivos:
         raise ErrorImportacion(f"No hay archivos .xlsx en {carpeta}.")
     existentes = {x["nombre"]: x["codigo"] for x in repo.listar_estudios()}

@@ -29,7 +29,7 @@ Expand-Archive -Path "$HOME\Downloads\entrega_v5_1_arbol_corregido.zip" -Destina
 
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt           # instala las 5 librerías nuevas
-python -m pytest -q                                 # deben pasar 126 pruebas
+python -m pytest -q                                 # deben pasar 127 pruebas
 streamlit run app.py
 ```
 

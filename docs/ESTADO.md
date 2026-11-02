@@ -1,6 +1,6 @@
 # Estado del desarrollo
 
-Comprobado el 2026-11-01 con 126 pruebas automatizadas (todas aprobadas), pruebas de humo de cada página, instalación limpia en un entorno nuevo y recorrido real en navegador (incluidos el análisis y la emisión del PDF).
+Comprobado el 2026-11-01 con 127 pruebas automatizadas (todas aprobadas), pruebas de humo de cada página, instalación limpia en un entorno nuevo y recorrido real en navegador (incluidos el análisis y la emisión del PDF).
 
 ## Terminado y comprobado
 
@@ -20,7 +20,7 @@ Comprobado el 2026-11-01 con 126 pruebas automatizadas (todas aprobadas), prueba
 | 4 · Ingesta | Conservación del original y su SHA-256. Identificación de estudio, versión y huella. Columnas por encabezado (tolera reordenar filas). Historial de cargas con diferencias | test_ingesta |
 | 5 · Calidad | 20 reglas, estados por registro, conteos conciliados, mensajes con hoja, fila y celda, 4 transformaciones autorizables, exclusiones con motivo, informe de incidencias en Excel | test_calidad, test_preparacion |
 | 6 · Exportación | ZIP SAL-1.0 con tablas normalizadas, manifiesto con huellas, salida reproducible byte a byte, lector Python que verifica integridad, aprobación del conjunto (X07) | test_preparacion, ejemplos/ |
-| 7 · Pruebas | 126 pruebas, también en GitHub Actions | `07_pruebas.md` |
+| 7 · Pruebas | 127 pruebas, también en GitHub Actions | `07_pruebas.md` |
 | 9 · Motor | Etapas, reglas, tablas ISO verificadas contra fórmula, anexo B.1, 4 escenarios y casos adversos | test_motor |
 | 10 · Informe | Versionado, comentarios, clonación, PDF leído en la prueba | test_analisis_servicio, test_interfaz |
 | 8 · Documentación | Insumos técnicos en `docs/` (4 generados desde el código) | — |
