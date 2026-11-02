@@ -1,0 +1,13 @@
+ANEXOS DE LOS CAPÍTULOS 10 Y 11
+
+Capitulo_10_figuras/   Figuras 1 a 13 (ANX-10-F01 a ANX-10-F13): capturas y diagramas originales del proyecto.
+Capitulo_11_informes/  Figuras 14 a 17 (ANX-11-I01 a ANX-11-I04): informes PDF completos de Testeo 1 a 4
+                       (EST-0001 a EST-0004, análisis v1, 1 de noviembre de 2026), generados por la app versión 6.
+Bases_de_prueba/       Lo que la app usó para generar los testeos (sección 10.7):
+                       - las 4 bases sintéticas en Excel (240 mediciones cada una, con errores sembrados E1 a E5);
+                       - criterios_prueba.json: límites de prueba por resultado y errores sembrados por escenario;
+                       - generar_bases_prueba.py: script que genera las bases (semillas fijas: mismo resultado siempre);
+                       - LEEME.md: descripción de las bases.
+Indice_de_anexos.csv   Correspondencia figura / código / archivo (se abre en Excel).
+
+Los datos de las bases son SINTÉTICOS: no son resultados de calibración.
