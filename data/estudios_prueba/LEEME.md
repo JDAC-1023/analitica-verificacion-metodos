@@ -13,7 +13,17 @@ preparar (TR01–TR04 autorizadas) → aprobar datos → configurar y ejecutar e
 
 **Diseño:** 8 temperaturas × 3 técnicos × 2 patrones × **5 lecturas por serie** = 240 mediciones.
 
-**Criterio de prueba** (`criterios_prueba.json`; no es un requisito del laboratorio): |sesgo| ≤ 0,10 °C · s_r ≤ 0,05 °C · s_I ≤ 0,08 °C.
+**Resultados evaluados:** cada base trae corrección, inestabilidad e inhomogeneidad; el motor corre todas las pruebas por separado para cada una.
+
+**Criterio de prueba** (`criterios_prueba.json`; no es un requisito del laboratorio):
+
+| Resultado | |sesgo| | s_r | s_I |
+| --- | --- | --- | --- |
+| Corrección | ≤ 0,10 °C | ≤ 0,05 °C | ≤ 0,08 °C |
+| Inestabilidad | no aplica (sin referencia) | ≤ 0,020 °C | ≤ 0,025 °C |
+| Inhomogeneidad | no aplica (sin referencia) | ≤ 0,025 °C | ≤ 0,030 °C |
+
+La inestabilidad (0,030 + 0,008·z °C) y la inhomogeneidad (0,040 + 0,010·z °C) siguen la misma forma de distribución que el escenario (normal o asimétrica).
 
 **Errores sembrados** (para probar la limpieza): E1 número con coma (TR02) · E2 técnico « t-02 » (TR03+TR04) ·
 E3 lectura obligatoria vacía (RC15, serie con 4 lecturas) · E4 hora «25:99» (RC19) · E5 lectura anómala de +10 s
