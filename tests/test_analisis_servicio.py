@@ -133,3 +133,19 @@ def test_flujo_condicional_y_veredicto(repo):
     assert "corridos" in imps["Sesgo (veracidad)"]["que_implica"] and "atípico" in imps["Repetibilidad"]["que_implica"]
     donde = [d for y in r1["resultados"] if y.get("caracteristica") == "fuentes_variacion" for d in y["estimacion"].get("donde", [])]
     assert donde and all(d["factor"] in ("Técnico", "Patrón") for d in donde) and any("T-03" in d["comparacion"] for d in donde)
+
+
+def test_copias_viejas_en_la_carpeta_no_duplican(tmp_path):
+    """Entrada: carpeta de bases con los 4 archivos nuevos, su índice y además copias viejas «0N_…_3_Variables.xlsx» (como queda
+    al descomprimir una entrega encima de otra). Esperado: se usan solo los 4 archivos del índice: un único Testeo por escenario."""
+    import shutil
+    from src.servicios.estudios_prueba import CARPETA_PRUEBAS, archivos_de_prueba
+    for f in list(CARPETA_PRUEBAS.glob("*.xlsx")) + [CARPETA_PRUEBAS / "criterios_prueba.json"]:
+        shutil.copy(f, tmp_path / f.name)
+    for f in (CARPETA_PRUEBAS / "version_anterior_2_replicas").glob("*.xlsx"):
+        shutil.copy(f, tmp_path / f.name)
+    elegidos = archivos_de_prueba(tmp_path)
+    assert [a.name for a in elegidos] == ["01_Normal_No_Cumple.xlsx", "02_Normal_Cumple.xlsx", "03_No_Normal_No_Cumple.xlsx",
+                                          "04_No_Normal_Cumple.xlsx"]
+    (tmp_path / "criterios_prueba.json").unlink()            # sin índice: uno por número de escenario
+    assert len(archivos_de_prueba(tmp_path)) == 4
