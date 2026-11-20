@@ -1,0 +1,46 @@
+flowchart TB
+  subgraph E["Entrada"]
+    A1["Plantilla PLT-1.0 diligenciada<br/>(src/plantillas/generador.py)"]
+    A2["Libro real del laboratorio<br/>(src/servicios/estudios_reales.py · leer_libro)"]
+  end
+  subgraph I["Ingeniería de datos (OE1)"]
+    B1["Lectura del libro<br/>src/ingesta/lector.py"]
+    B2["Reglas RC01–RC20 y TR01–TR04<br/>src/calidad/evaluador.py · reglas.py"]
+    B3["Carga · preparación · aprobación<br/>src/servicios/flujo.py"]
+    B4[("Base de datos local JSON<br/>src/persistencia/repositorio.py<br/>estudios/ · cargas/ · preparaciones/ · analisis/")]
+    B5["Salida SAL-1.0 (CSV + manifiesto)<br/>src/exportacion/salidas.py"]
+  end
+  subgraph M["Motor estadístico determinista (OE2)"]
+    C0["Configuración: resultados evaluados, límites aprobados<br/>src/motor/configuracion.py"]
+    C1["Vista de análisis<br/>src/motor/datos.py · construir"]
+    C2["Limpieza y estructura<br/>limpieza.py"]
+    C3["Atípicos (Grubbs; interlab: Mandel, Cochran)<br/>atipicos.py · tablas_iso.py"]
+    C4["Normalidad (Shapiro-Wilk)<br/>normalidad.py"]
+    C5["Homocedasticidad (Bartlett / Fligner)<br/>supuestos.py"]
+    C6["Desempeño: sesgo, s_r, s_I, s_R<br/>desempeno.py"]
+    C7["Fuentes de variación: ANOVA+Tukey · Welch+Games-Howell · Kruskal+Dunn<br/>fuentes.py"]
+    C8["Criterios y veredicto<br/>criterios.py · caracteristicas.py"]
+    C9["Orquestación por resultado evaluado<br/>motor.py · multi.py (ejecutar_todos)"]
+  end
+  subgraph S["Validación y despliegue (OE3, OE4)"]
+    D1["resultado.json inmutable + huella SHA-256"]
+    D2["Informe PDF<br/>src/informes/pdf.py"]
+    D3["Contraste con el informe del laboratorio<br/>src/contraste/laboratorio.py"]
+    D4["CSV de resultados y estabilidad<br/>herramientas/exportar_resultados.py · estabilidad.py"]
+    D5["Interfaz Streamlit<br/>app.py · interfaz/paginas/*"]
+  end
+  A1 --> B1
+  A2 -->|"valores sin modificar"| A1
+  B1 --> B2 --> B3 --> B4
+  B4 --> B5
+  B4 --> C1
+  C0 --> C9
+  C9 --> C1 --> C2 --> C3 --> C4 --> C5 --> C6 --> C7 --> C8 --> D1
+  D1 --> B4
+  D1 --> D2
+  D1 --> D3
+  D1 --> D4
+  D5 -.-> B3
+  D5 -.-> C0
+  D5 -.-> D2
+  D5 -.-> D3

@@ -1,0 +1,4 @@
+Camara_10HR · Brandon · Corrección: valores idénticos en T3, T5 (np.float64(3.1242916338555826)); se conservan tal como vienen.
+Camara_95HR · Brandon · Corrección: valores idénticos en T3, T4, T5 (np.float64(0.6562315525690252)); se conservan tal como vienen.
+Camara_95HR · Brandon · Inestabilidad: valores idénticos en T3, T5 (np.float64(0.9824209657556224)); se conservan tal como vienen.
+Camara_95HR · Brandon · Inhomogeneidad: valores idénticos en T3, T5 (np.float64(3.218699301384717)); se conservan tal como vienen.

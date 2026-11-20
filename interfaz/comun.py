@@ -29,6 +29,7 @@ PAGINAS = {
     "datos": "interfaz/paginas/datos.py",
     "analisis": "interfaz/paginas/analisis.py",
     "informes": "interfaz/paginas/informes.py",
+    "contraste": "interfaz/paginas/contraste.py",
 }
 
 ETIQUETA_ESTADO = {

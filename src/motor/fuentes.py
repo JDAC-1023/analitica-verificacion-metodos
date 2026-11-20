@@ -190,7 +190,8 @@ def _tukey(datos: dict, alfa: float) -> list[dict]:
 
 def ejecutar(ctx: Contexto) -> None:
     cfg = ctx.cfg
-    factores = list(cfg.factores_precision_intermedia)
+    factores = list(cfg.factores_precision_intermedia) + [f for f in getattr(cfg, "factores_bloque", [])
+                                                          if f not in cfg.factores_precision_intermedia]
     if cfg.es_interlaboratorio or not factores:
         return
     columnas = {f"campo:{f}": nombre_campo(ctx.e, f) for f in factores}
@@ -200,10 +201,11 @@ def ejecutar(ctx: Contexto) -> None:
         punto = g["punto"].iloc[0]
         agr = f"nivel {punto}"
         activos = {c: n for c, n in columnas.items() if g[c].nunique() >= 2}
-        gl_res = len(g) - int(np.prod([g[c].nunique() for c in activos])) if activos else 0
+        # gl del residuo del modelo aditivo (la interacción solo se incluye si hay réplicas en cada combinación)
+        gl_res = len(g) - (1 + sum(g[c].nunique() - 1 for c in activos)) if activos else 0
         if not activos or gl_res < 1:
             ctx.nuevo(ETAPA, TECNICA, agr, DATOS_INSUFICIENTES, caracteristica="fuentes_variacion", punto_id=punto_id, n=len(g),
-                      origen_regla=COMPLEMENTARIA, motivos=["Se necesitan al menos 2 niveles de algún factor y réplicas dentro de cada combinación."])
+                      origen_regla=COMPLEMENTARIA, motivos=["Se necesitan al menos 2 niveles de algún factor y grados de libertad para el residuo."])
             continue
         normal = ctx.normalidad.get(("precision", punto_id)) == "no_rechaza"
         homo = ctx.homocedasticidad.get(punto_id)

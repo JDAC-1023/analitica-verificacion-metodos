@@ -1,0 +1,16 @@
+escenario,resultado_evaluado,estado_resultado,replicas
+01_Normal_No_Cumple,Corrección,NO_CONFORME,30
+01_Normal_No_Cumple,Inestabilidad,CONFORME,30
+01_Normal_No_Cumple,Inhomogeneidad,CONFORME,28
+01_Normal_No_Cumple,Inhomogeneidad,CONFORME_CON_OBSERVACIONES,2
+02_Normal_Cumple,Corrección,CONFORME,19
+02_Normal_Cumple,Corrección,CONFORME_CON_OBSERVACIONES,11
+02_Normal_Cumple,Inestabilidad,CONFORME,30
+02_Normal_Cumple,Inhomogeneidad,CONFORME,28
+02_Normal_Cumple,Inhomogeneidad,CONFORME_CON_OBSERVACIONES,2
+03_No_Normal_No_Cumple,Corrección,NO_CONFORME,30
+03_No_Normal_No_Cumple,Inestabilidad,CONFORME_CON_OBSERVACIONES,30
+03_No_Normal_No_Cumple,Inhomogeneidad,CONFORME_CON_OBSERVACIONES,30
+04_No_Normal_Cumple,Corrección,CONFORME_CON_OBSERVACIONES,30
+04_No_Normal_Cumple,Inestabilidad,CONFORME_CON_OBSERVACIONES,30
+04_No_Normal_Cumple,Inhomogeneidad,CONFORME_CON_OBSERVACIONES,30

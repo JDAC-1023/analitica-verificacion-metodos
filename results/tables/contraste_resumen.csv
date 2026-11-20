@@ -1,0 +1,9 @@
+magnitud,prueba,comparaciones,coincidencias,dif_max_motor,dif_max_reproduccion
+temperatura,ANOVA · Operador (p),9,9,4.300934181022953e-07,4.300934146606039e-07
+temperatura,ANOVA · Tiempo (p),9,9,4.995473603108813e-07,4.995473603108813e-07
+temperatura,Bartlett por operador (p),9,9,3.600314096618984e-05,3.600314096618984e-05
+temperatura,Shapiro-Wilk (p),9,9,0.817595318218129,4.6904402924541344e-05
+humedad,ANOVA · Operador (p),9,9,4.969032075807789e-07,4.969032100232695e-07
+humedad,ANOVA · Tiempo (p),9,9,3.685803866976256e-07,3.6858038653109215e-07
+humedad,Bartlett por operador (p),9,9,4.6830686122212306e-05,4.683068611988084e-05
+humedad,Shapiro-Wilk (p),9,9,0.4052662094510275,4.570422821856268e-05

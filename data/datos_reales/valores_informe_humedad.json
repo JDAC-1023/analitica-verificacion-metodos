@@ -1,0 +1,165 @@
+{
+ "informe": "R-F-LAB-01 Informe 2026-02-01 · Verificación de método DI5 humedad relativa (DKD-R 5-7:2025)",
+ "archivo_datos": "DATA_HUMEDAD.xlsx",
+ "fuente": "Transcrito de las salidas impresas en el informe",
+ "puntos": [
+  "10 %hr",
+  "50 %hr",
+  "95 %hr"
+ ],
+ "shapiro": {
+  "Corrección": [
+   [
+    0.8963,
+    0.0836
+   ],
+   [
+    0.9621,
+    0.7297
+   ],
+   [
+    0.969,
+    0.8424
+   ]
+  ],
+  "Inestabilidad": [
+   [
+    0.9589,
+    0.6735
+   ],
+   [
+    0.91,
+    0.1353
+   ],
+   [
+    0.9236,
+    0.2187
+   ]
+  ],
+  "Inhomogeneidad": [
+   [
+    0.9409,
+    0.3941
+   ],
+   [
+    0.9443,
+    0.4401
+   ],
+   [
+    0.9213,
+    0.2014
+   ]
+  ]
+ },
+ "bartlett_operador": {
+  "Corrección": [
+   [
+    0.8814,
+    0.6436
+   ],
+   [
+    1.8505,
+    0.3964
+   ],
+   [
+    5.1045,
+    0.0779
+   ]
+  ],
+  "Inestabilidad": [
+   [
+    1.7312,
+    0.4208
+   ],
+   [
+    4.6564,
+    0.0975
+   ],
+   [
+    0.6086,
+    0.7377
+   ]
+  ],
+  "Inhomogeneidad": [
+   [
+    0.1154,
+    0.9439
+   ],
+   [
+    0.5537,
+    0.7582
+   ],
+   [
+    0.1865,
+    0.911
+   ]
+  ]
+ },
+ "anova": {
+  "Corrección": [
+   [
+    1.556954,
+    0.268468,
+    1.40675,
+    0.314983
+   ],
+   [
+    0.428938,
+    0.665337,
+    0.583552,
+    0.683599
+   ],
+   [
+    0.11633,
+    0.89166,
+    2.046893,
+    0.180342
+   ]
+  ],
+  "Inestabilidad": [
+   [
+    0.344407,
+    0.718651,
+    1.534717,
+    0.280501
+   ],
+   [
+    0.331006,
+    0.727587,
+    0.466422,
+    0.759421
+   ],
+   [
+    1.394164,
+    0.302373,
+    0.628604,
+    0.655711
+   ]
+  ],
+  "Inhomogeneidad": [
+   [
+    0.711712,
+    0.519428,
+    0.829708,
+    0.54223
+   ],
+   [
+    4.740557,
+    0.043862,
+    3.393692,
+    0.066485
+   ],
+   [
+    0.323229,
+    0.732836,
+    0.034549,
+    0.997213
+   ]
+  ]
+ },
+ "conclusiones": {
+  "dixon": "Sin atípicos en ningún conjunto (α = 0,05).",
+  "tukey": "Ningún par de operadores ni de tiempos difiere significativamente; en Inhomogeneidad 50 %hr el ANOVA es significativo para Operador pero Tukey no identifica pares.",
+  "metodo": "Método confirmado; la precisión intermedia no cambia la incertidumbre expandida reportada (diferencia < 5 %)."
+ }
+}

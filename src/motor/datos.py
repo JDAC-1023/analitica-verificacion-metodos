@@ -112,6 +112,9 @@ def construir(tablas: dict, e: Estudio, cfg: ConfiguracionAnalisis) -> Observaci
     for c in campos:
         df[f"campo:{c}"] = _campo(df, niveles, e, c).values
     df["celda"] = df[[f"campo:{c}" for c in campos]].agg(" · ".join, axis=1) if campos else "Todas"
+    for c in getattr(cfg, "factores_bloque", []):            # factores de bloque: columna propia, no forman celdas
+        if c not in campos:
+            df[f"campo:{c}"] = _campo(df, niveles, e, c).values
     excl_ids = {x.medicion_id for x in cfg.exclusiones}
     excluidas = df[df["medicion_id"].isin(excl_ids)].copy()
     excluidas["motivo"] = excluidas["medicion_id"].map({x.medicion_id: x.motivo for x in cfg.exclusiones})

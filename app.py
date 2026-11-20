@@ -21,6 +21,8 @@ def _testeos_listos() -> bool:
     if os.environ.get("AVM_SIN_TESTEOS") != "1":
         from src.servicios.estudios_prueba import asegurar_testeos
         asegurar_testeos(repositorio())
+        from src.servicios.estudios_reales import asegurar_estudios_reales
+        asegurar_estudios_reales(repositorio())       # datos reales del laboratorio (temperatura y humedad)
     return True
 
 
@@ -45,6 +47,7 @@ paginas = {
     "Análisis e informes": [
         st.Page("interfaz/paginas/analisis.py", title="Análisis estadístico", icon=":material/query_stats:"),
         st.Page("interfaz/paginas/informes.py", title="Informes", icon=":material/description:"),
+        st.Page("interfaz/paginas/contraste.py", title="Contraste con datos reales", icon=":material/compare_arrows:"),
     ],
 }
 navegacion = st.navigation(paginas)

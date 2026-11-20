@@ -145,6 +145,9 @@ class ConfiguracionAnalisis:
     es_interlaboratorio: bool = False
     factor_laboratorio: str = ""         # "tecnico" | "patron" | id de factor (solo si es interlaboratorio)
     factores_precision_intermedia: list[str] = field(default_factory=list)
+    # Factores de bloque: solo entran en «fuentes de variación» como efectos aditivos (sin interacción). Sirven para
+    # diseños con una sola observación por combinación (p. ej. Operador × Tiempo sin réplica), donde no forman celdas.
+    factores_bloque: list[str] = field(default_factory=list)
     # sesgo
     referencia_tipo: str = "ninguna"     # ninguna | valor_por_nivel | objeto_es_diferencia
     referencias: list[ReferenciaNivel] = field(default_factory=list)
